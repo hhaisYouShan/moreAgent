@@ -160,6 +160,64 @@ Clean both runs and worktrees:
 moreagent clean --all
 ```
 
+### View Worktree Diff
+
+Show git diff from the task worktree of the latest run:
+
+```bash
+moreagent diff
+```
+
+Show diff for a specific run:
+
+```bash
+moreagent diff --run run-2026-06-29T12-00-00-abc123
+```
+
+This shows `git status`, `git diff --stat`, and `git diff` from the task worktree — not the main project.
+
+### Inspect Run Artifacts
+
+Show a summary of the latest run with all session artifact paths:
+
+```bash
+moreagent inspect
+```
+
+Show a specific agent's primary artifact content:
+
+```bash
+moreagent inspect --agent reviewer
+moreagent inspect --agent tester
+moreagent inspect --agent implementer
+```
+
+Show a specific run:
+
+```bash
+moreagent inspect --run run-2026-06-29T12-00-00-abc123
+```
+
+For repair sessions (e.g. `repair-1-tester`), `--agent tester` finds the latest tester-related session first.
+
+### Artifact Decision Markers
+
+Tester and reviewer artifacts include machine-readable markers used by the repair loop:
+
+**test-report.md**: The first line must be exactly one of:
+```
+Result: PASS
+Result: FAIL
+```
+
+**review-report.md**: The first line must be exactly one of:
+```
+Decision: APPROVED
+Decision: CHANGES_REQUESTED
+```
+
+If an artifact is missing these markers, MoreAgent treats it as passed (compatible behavior). See `evaluateArtifactDecision` in `src/commands/start.ts` for the parsing logic.
+
 ## Project Structure
 
 ```
@@ -220,6 +278,34 @@ If that succeeds, run the full pipeline:
 
 ```bash
 moreagent start --once --task "给 README 增加一个 Usage 示例"
+```
+
+### Manual Review Workflow
+
+MoreAgent does NOT auto-merge or auto-push. After a run completes, follow this manual review process:
+
+```bash
+# 1. Check the run summary and session status
+moreagent status --latest
+
+# 2. Review the worktree diff (all code changes)
+moreagent diff
+
+# 3. Read the reviewer's findings
+moreagent inspect --agent reviewer
+
+# 4. Manually enter the worktree to review changes
+cd .moreagent/worktrees/agent-run-<latest>
+git status
+git diff
+
+# 5. If satisfied, manually merge (MoreAgent never does this):
+git checkout main
+git merge agent/run-<latest>
+# OR cherry-pick specific changes
+
+# 6. Clean up when done
+moreagent clean --all
 ```
 
 ## Troubleshooting

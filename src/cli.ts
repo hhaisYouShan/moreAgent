@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
 import { cleanCommand } from './commands/clean';
+import { diffCommand } from './commands/diff';
 import { initCommand } from './commands/init';
+import { inspectCommand } from './commands/inspect';
 import { statusCommand } from './commands/status';
 import { startCommand } from './commands/start';
 
@@ -16,6 +18,12 @@ Commands:
   init                      Initialize a new MoreAgent project
   start --once --task <...> Run a task through the agent pipeline
   status                    Show recent run status
+  status --latest           Show the latest run in detail
+  diff                      Show worktree git diff for the latest run
+  diff --run <id>           Show worktree git diff for a specific run
+  inspect                   Show latest run overview
+  inspect --agent <name>    Show an agent's primary artifact
+  inspect --run <id>        Show a specific run
   clean                     Clean runs or worktrees
 
 Start Options:
@@ -23,8 +31,12 @@ Start Options:
   --task <description>      The task to execute
   --agent <name>            Run a specific agent only (optional)
 
-Status Options:
-  --latest                  Show the latest run in detail
+Diff Options:
+  --run <runId>             Show diff for a specific run (default: latest)
+
+Inspect Options:
+  --run <runId>             Show a specific run (default: latest)
+  --agent <name>            Show a specific agent's primary artifact
 
 Clean Options:
   --runs                    Clean .moreagent/runs and reset sessions.json
@@ -37,6 +49,10 @@ Examples:
   moreagent start --once --task "refactor database layer" --agent implementer
   moreagent status
   moreagent status --latest
+  moreagent diff
+  moreagent diff --run run-2026-06-29T12-00-00-abc123
+  moreagent inspect
+  moreagent inspect --agent reviewer
   moreagent clean --runs
   moreagent clean --worktrees
   moreagent clean --all
@@ -82,6 +98,25 @@ async function main(): Promise<void> {
       case 'status':
         statusCommand({ latest: args.includes('--latest') });
         break;
+
+      case 'diff': {
+        const diffRunIdx = args.indexOf('--run');
+        const diffRunId =
+          diffRunIdx !== -1 ? args[diffRunIdx + 1] : undefined;
+        diffCommand({ run: diffRunId });
+        break;
+      }
+
+      case 'inspect': {
+        const inspectRunIdx = args.indexOf('--run');
+        const inspectRunId =
+          inspectRunIdx !== -1 ? args[inspectRunIdx + 1] : undefined;
+        const inspectAgentIdx = args.indexOf('--agent');
+        const inspectAgent =
+          inspectAgentIdx !== -1 ? args[inspectAgentIdx + 1] : undefined;
+        inspectCommand({ run: inspectRunId, agent: inspectAgent });
+        break;
+      }
 
       case 'clean': {
         const cleanRuns = args.includes('--runs') || args.includes('--all');
