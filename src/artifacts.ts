@@ -116,6 +116,16 @@ export function writeAllArtifactTemplates(artifactDir: string): void {
   }
 }
 
+export function writePrimaryArtifactTemplate(
+  artifactDir: string,
+  primaryArtifact: string
+): void {
+  if (!fs.existsSync(artifactDir)) {
+    fs.mkdirSync(artifactDir, { recursive: true });
+  }
+  writeArtifactTemplate(artifactDir, primaryArtifact as ArtifactName);
+}
+
 export function writeTaskMarkdown(
   artifactDir: string,
   agentName: string,

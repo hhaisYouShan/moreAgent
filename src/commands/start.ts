@@ -8,7 +8,7 @@ import {
   updateSession,
   markRunningRunsAsStaleFailure,
 } from '../session';
-import { writeAllArtifactTemplates, writeTaskMarkdown, updateArtifact } from '../artifacts';
+import { writePrimaryArtifactTemplate, writeTaskMarkdown, updateArtifact } from '../artifacts';
 import { OpenCodeRuntimeAdapter } from '../runtime/adapter';
 import { Run, Session, AgentConfig } from '../types';
 
@@ -70,7 +70,8 @@ export async function startCommand(options: StartOptions): Promise<void> {
     const agentDir = path.join(runDir, agent.name);
 
     fs.mkdirSync(agentDir, { recursive: true });
-    writeAllArtifactTemplates(agentDir);
+    const primaryArtifact = ROLE_ARTIFACT_MAP[agent.role] || 'output.md';
+    writePrimaryArtifactTemplate(agentDir, primaryArtifact);
 
     const context = buildContext(artifactContexts);
     writeTaskMarkdown(agentDir, agent.name, agent.role, options.task, context);
@@ -83,8 +84,6 @@ export async function startCommand(options: StartOptions): Promise<void> {
       session.worktreePath = workingDir;
     }
     updateSession(runId, session);
-
-    const primaryArtifact = ROLE_ARTIFACT_MAP[agent.role] || 'output.md';
 
     try {
       const result = await adapter.execute({
