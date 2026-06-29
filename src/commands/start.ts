@@ -7,6 +7,7 @@ import {
   updateRun,
   updateSession,
   markRunningRunsAsStaleFailure,
+  readSessions,
 } from '../session';
 import { writePrimaryArtifactTemplate, writeTaskMarkdown, updateArtifact } from '../artifacts';
 import { OpenCodeRuntimeAdapter } from '../runtime/adapter';
@@ -19,7 +20,12 @@ import {
   getAgentRuntimeSessionId,
   setAgentRuntimeSessionId,
 } from '../runtimeSessions';
-import { Run, Session, AgentConfig } from '../types';
+import { Run, Session, AgentConfig, WorkflowInfo } from '../types';
+import {
+  FULL_WORKFLOW_PHASES,
+  getPhaseIndex,
+  isValidPhase,
+} from '../workflow';
 
 export interface StartOptions {
   once: boolean;
@@ -27,6 +33,9 @@ export interface StartOptions {
   agent?: string;
   loop?: boolean;
   tmux?: boolean;
+  resume?: boolean;
+  resumeRunId?: string;
+  fromPhase?: string;
 }
 
 export interface TaskRunResult {
@@ -42,6 +51,21 @@ export async function startCommand(options: StartOptions): Promise<void> {
   if (options.loop) {
     await loopCommand(options.tmux ?? false);
     return;
+  }
+
+  if (options.resume) {
+    const runId = resolveResumeRunId(options);
+    if (!runId) {
+      throw new Error('No runs found. Use --run <runId> to resume a specific run.');
+    }
+    await resumeWorkflow(runId, options);
+    return;
+  }
+
+  if (options.fromPhase && !isValidPhase(options.fromPhase)) {
+    throw new Error(
+      `Invalid phase: "${options.fromPhase}". Valid phases: ${FULL_WORKFLOW_PHASES.map((p) => p.id).join(', ')}`
+    );
   }
 
   const result = await runTaskOnce(options);
@@ -122,14 +146,6 @@ export async function runTaskOnce(options: StartOptions): Promise<TaskRunResult>
   const runId = generateRunId();
   const runDir = path.join(getMoreAgentDir(), 'runs', runId);
 
-  const tmux = options.tmux ? initTmux(runId) : null;
-
-  console.log(`Starting run: ${runId}`);
-  console.log(`Task: ${options.task}`);
-  console.log(`Agents: ${config.agents.map((a) => a.name).join(', ')}\n`);
-
-  fs.mkdirSync(runDir, { recursive: true });
-
   const agents = options.agent
     ? config.agents.filter((a) => a.name === options.agent)
     : config.agents;
@@ -138,6 +154,24 @@ export async function runTaskOnce(options: StartOptions): Promise<TaskRunResult>
     throw new Error(`No agent found with name "${options.agent}"`);
   }
 
+  const agentByRole = new Map(agents.map((agent) => [agent.role, agent]));
+  const hasFullWorkflow =
+    !options.agent &&
+    agentByRole.has('brain') &&
+    agentByRole.has('product') &&
+    agentByRole.has('frontend') &&
+    agentByRole.has('backend') &&
+    agentByRole.has('tester') &&
+    agentByRole.has('reviewer');
+
+  const tmux = options.tmux ? initTmux(runId) : null;
+
+  console.log(`Starting run: ${runId}`);
+  console.log(`Task: ${options.task}`);
+  console.log(`Agents: ${config.agents.map((a) => a.name).join(', ')}\n`);
+
+  fs.mkdirSync(runDir, { recursive: true });
+
   const needsWorktree = agents.some((a) => a.canModifyCode);
   const taskWorktree = needsWorktree ? createTaskWorktree(runId) : null;
 
@@ -145,6 +179,9 @@ export async function runTaskOnce(options: StartOptions): Promise<TaskRunResult>
     id: runId,
     task: options.task,
     status: 'running',
+    workflow: hasFullWorkflow
+      ? { profile: 'full', completedPhases: [] }
+      : undefined,
     createdAt: new Date().toISOString(),
     artifactDir: runDir,
     sessions: [],
@@ -156,34 +193,26 @@ export async function runTaskOnce(options: StartOptions): Promise<TaskRunResult>
 
   const adapter = new OpenCodeRuntimeAdapter();
   const artifactContexts: string[] = [];
-  const agentByRole = new Map(agents.map((agent) => [agent.role, agent]));
-  const hasFullWorkflow =
-    !options.agent &&
-    agentByRole.has('brain') &&
-    agentByRole.has('product') &&
-    agentByRole.has('frontend') &&
-    agentByRole.has('backend') &&
-    agentByRole.has('tester') &&
-    agentByRole.has('reviewer');
   const hasRepairFlow =
     !hasFullWorkflow &&
     !options.agent &&
-    agentByRole.has('implementer') &&
-    agentByRole.has('tester') &&
-    agentByRole.has('reviewer');
+    agents.some((a) => a.role === 'implementer') &&
+    agents.some((a) => a.role === 'tester') &&
+    agents.some((a) => a.role === 'reviewer');
 
   const pipelineSucceeded = hasFullWorkflow
-    ? await runFullWorkflow({
+    ? await executePhases({
       config,
       options,
       run,
       runDir,
       taskWorktree,
       agents,
+      agentByRole,
       adapter,
       artifactContexts,
       tmux,
-      agentByRole,
+      startFrom: options.fromPhase ? getPhaseIndex(options.fromPhase) : 0,
     })
     : hasRepairFlow
       ? await runRepairPipeline({
@@ -246,127 +275,6 @@ interface ArtifactDecision {
   reason?: string;
 }
 
-async function runFullWorkflow(
-  ctx: PipelineContext & { agentByRole: Map<string, AgentConfig> }
-): Promise<boolean> {
-  const { agentByRole } = ctx;
-  const brain = agentByRole.get('brain')!;
-  const product = agentByRole.get('product')!;
-  const frontend = agentByRole.get('frontend')!;
-  const backend = agentByRole.get('backend')!;
-  const tester = agentByRole.get('tester')!;
-  const reviewer = agentByRole.get('reviewer')!;
-  const MAX_GATE_ROUNDS = 2;
-
-  const runAgent = async (
-    agent: AgentConfig,
-    sessionName: string,
-    extraCtx?: string | null,
-    override?: string
-  ) => {
-    const session = ensureSessionForRun(ctx.run, agent, sessionName, ctx.runDir);
-    return executeAgentSession({
-      ...ctx, agent, session, sessionName,
-      extraContext: extraCtx ?? '',
-      primaryArtifactOverride: override,
-    });
-  };
-
-  const readArtifact = (agentObj: AgentConfig, dir: string) => {
-    const art = getPrimaryArtifact(agentObj);
-    return readArtifactFromDir(dir, art);
-  };
-
-  // Phase 1: Brain analysis
-  console.log('\n=== Phase 1: Task Analysis ===');
-  const brainRes = await runAgent(brain, 'brain');
-  if (!brainRes.success) return false;
-
-  // Phase 2: Product PRD
-  console.log('\n=== Phase 2: Product PRD ===');
-  const prdRes = await runAgent(product, 'product', readArtifact(brain, brainRes.agentDir));
-  if (!prdRes.success) return false;
-
-  // Phase 3: PRD Review Meeting
-  console.log('\n=== Phase 3: PRD Review Meeting ===');
-  const prdCtx = readArtifact(product, prdRes.agentDir);
-  const fePrdReview = await runAgent(frontend, 'frontend-prd-review', prdCtx, 'frontend-prd-review.md');
-  const bePrdReview = await runAgent(backend, 'backend-prd-review', prdCtx, 'backend-prd-review.md');
-  const testPrdReview = await runAgent(tester, 'test-prd-review', prdCtx, 'test-prd-review.md');
-
-  // Phase 4-5: PRD Gate (up to MAX_GATE_ROUNDS revisions)
-  console.log('\n=== Phase 4-5: PRD Gate ===');
-  let prdPassed = false;
-  for (let round = 1; round <= MAX_GATE_ROUNDS + 1; round++) {
-    const reviewCtx = [
-      readArtifact(frontend, fePrdReview.agentDir),
-      readArtifact(backend, bePrdReview.agentDir),
-      readArtifact(tester, testPrdReview.agentDir),
-    ].filter(Boolean).join('\n\n---\n\n');
-
-    const gateSessionName = `prd-gate-${round}`;
-    const gateRes = await runAgent(brain, gateSessionName, reviewCtx, 'prd-decision.md');
-    if (!gateRes.success) return false;
-
-    const gateDecision = evaluateGateArtifactFile(gateRes.agentDir, 'prd-decision.md');
-    if (gateDecision.passed) { prdPassed = true; break; }
-    if (round > MAX_GATE_ROUNDS) return false;
-
-    console.log(`  PRD gate round ${round} failed, revising...`);
-    const revisedPrd = await runAgent(product, `product-revision-${round}`, reviewCtx);
-    if (!revisedPrd.success) return false;
-  }
-  if (!prdPassed) return false;
-
-  // Phase 6: Tech Plans
-  console.log('\n=== Phase 6: Technical Plans ===');
-  const fePlan = await runAgent(frontend, 'frontend-plan');
-  const bePlan = await runAgent(backend, 'backend-plan');
-  const testPlan = await runAgent(tester, 'test-plan', '', 'test-plan.md');
-  if (!fePlan.success || !bePlan.success || !testPlan.success) return false;
-
-  // Phase 7: Tech Gate
-  console.log('\n=== Phase 7: Tech Gate ===');
-  let techPassed = false;
-  for (let round = 1; round <= MAX_GATE_ROUNDS + 1; round++) {
-    const techCtx = [
-      readArtifact(frontend, fePlan.agentDir),
-      readArtifact(backend, bePlan.agentDir),
-      readArtifact(tester, testPlan.agentDir),
-    ].filter(Boolean).join('\n\n---\n\n');
-
-    const techGateRes = await runAgent(brain, `tech-gate-${round}`, techCtx, 'tech-review.md');
-    if (!techGateRes.success) return false;
-
-    const techDecision = evaluateGateArtifactFile(techGateRes.agentDir, 'tech-review.md');
-    if (techDecision.passed) { techPassed = true; break; }
-    if (round > MAX_GATE_ROUNDS) return false;
-
-    console.log(`  Tech gate round ${round} failed, revising...`);
-    const reviseFe = await runAgent(frontend, `frontend-plan-revision-${round}`);
-    const reviseBe = await runAgent(backend, `backend-plan-revision-${round}`);
-    const reviseTest = await runAgent(tester, `test-plan-revision-${round}`, '', 'test-plan.md');
-    if (!reviseFe.success || !reviseBe.success || !reviseTest.success) return false;
-  }
-  if (!techPassed) return false;
-
-  // Phase 8: Implementation
-  console.log('\n=== Phase 8: Implementation ===');
-  const feImpl = await runAgent(frontend, 'frontend-implementation', '', 'frontend-implementation.md');
-  const beImpl = await runAgent(backend, 'backend-implementation', '', 'backend-implementation.md');
-  if (!feImpl.success || !beImpl.success) return false;
-
-  // Phase 9: Testing
-  console.log('\n=== Phase 9: Testing ===');
-  const testRes = await runAgent(tester, 'tester');
-  if (!testRes.success) return false;
-
-  // Phase 10: Review
-  console.log('\n=== Phase 10: Code Review ===');
-  const reviewRes = await runAgent(reviewer, 'reviewer');
-  return reviewRes.success;
-}
-
 function evaluateGateArtifactFile(agentDir: string, fileName: string): ArtifactDecision {
   const content = readArtifactFromDir(agentDir, fileName);
   if (!content) return { passed: true };
@@ -384,6 +292,145 @@ function readArtifactFromDir(agentDir: string, fileName: string): string | null 
   if (!fs.existsSync(fp)) return null;
   const c = fs.readFileSync(fp, 'utf-8').trim();
   return c.length > 0 ? c : null;
+}
+
+function resolveResumeRunId(options: StartOptions): string | null {
+  if (options.resumeRunId) return options.resumeRunId;
+  if (options.resume) {
+    const data = readSessions();
+    const latest = data.runs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+    return latest?.id ?? null;
+  }
+  return null;
+}
+
+async function resumeWorkflow(runId: string, options: StartOptions): Promise<void> {
+  const data = readSessions();
+  const run = data.runs.find((r) => r.id === runId);
+  if (!run) throw new Error(`Run not found: ${runId}`);
+  if (!run.workflow || run.workflow.profile !== 'full') {
+    throw new Error('Resume currently supports full workflow runs only.');
+  }
+  if (run.status === 'completed') {
+    console.log('Run already completed.');
+    return;
+  }
+
+  const config = readConfig();
+  assertRuntimeExecutable(config.runtime.opencodePath);
+  const agentByRole = new Map(config.agents.map((a) => [a.role, a]));
+
+  markRunningRunsAsStaleFailure();
+  run.status = 'running';
+  updateRun(run);
+
+  const tmux = options.tmux ? initTmux(runId) : null;
+
+  const startFrom = run.workflow.completedPhases.length > 0
+    ? getPhaseIndex(run.workflow.completedPhases[run.workflow.completedPhases.length - 1]) + 1
+    : 0;
+
+  console.log(`Resuming run: ${runId} from phase ${FULL_WORKFLOW_PHASES[startFrom]?.id ?? 'unknown'}`);
+
+  const succeeded = await executePhases({
+    config, options, run, runDir: run.artifactDir,
+    taskWorktree: run.sessions.find((s) => s.worktreePath)?.worktreePath ?? null,
+    agents: config.agents, agentByRole,
+    adapter: new OpenCodeRuntimeAdapter(),
+    artifactContexts: [],
+    tmux, startFrom,
+  });
+
+  run.status = succeeded ? 'completed' : 'failed';
+  if (run.workflow) run.workflow.currentPhase = undefined;
+  updateRun(run);
+
+  console.log(`Run ${runId} ${run.status}`);
+  if (!succeeded) {
+    console.log('Resume with:');
+    console.log(`  moreagent start --resume --run ${runId}`);
+    if (run.id === (readSessions().runs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]?.id)) {
+      console.log('  moreagent start --resume --latest');
+    }
+  }
+}
+
+async function executePhases(ctx: {
+  config: ReturnType<typeof readConfig>;
+  options: StartOptions;
+  run: Run;
+  runDir: string;
+  taskWorktree: string | null;
+  agents: AgentConfig[];
+  agentByRole: Map<string, AgentConfig>;
+  adapter: OpenCodeRuntimeAdapter;
+  artifactContexts: string[];
+  tmux: TmuxContext | null;
+  startFrom: number;
+}): Promise<boolean> {
+  const { run, agentByRole, adapter, tmux, startFrom } = ctx;
+  const brain = agentByRole.get('brain')!;
+  const product = agentByRole.get('product')!;
+  const frontend = agentByRole.get('frontend')!;
+  const backend = agentByRole.get('backend')!;
+  const tester = agentByRole.get('tester')!;
+  const reviewer = agentByRole.get('reviewer')!;
+  const MAX_GATE_ROUNDS = 2;
+
+  const runner = async (
+    agent: AgentConfig,
+    sessionName: string,
+    artifact: string,
+    extraCtx?: string | null,
+  ) => {
+    let session = run.sessions.find((s) => s.agentName === sessionName);
+    if (session && session.status === 'completed') {
+      console.log(`  Skipping completed session: ${sessionName}`);
+      return { success: true, agentDir: session.artifactDir };
+    }
+    if (!session) {
+      session = ensureSessionForRun(run, agent, sessionName, ctx.runDir);
+    }
+    return executeAgentSession({
+      config: ctx.config, options: ctx.options, run, runDir: ctx.runDir,
+      taskWorktree: ctx.taskWorktree, agents: ctx.agents, adapter, tmux,
+      artifactContexts: ctx.artifactContexts,
+      agent, session, sessionName,
+      extraContext: extraCtx ?? '',
+      primaryArtifactOverride: artifact,
+    });
+  };
+
+  const readArtifact = (dir: string, file: string) => readArtifactFromDir(dir, file);
+
+  if (!run.workflow) {
+    run.workflow = { profile: 'full', completedPhases: [] };
+  }
+  const wf = run.workflow;
+
+  for (let pi = startFrom; pi < FULL_WORKFLOW_PHASES.length; pi++) {
+    const phase = FULL_WORKFLOW_PHASES[pi];
+    wf.currentPhase = phase.id;
+    updateRun(run);
+
+    console.log(`\n=== Phase: ${phase.id} (${phase.description}) ===`);
+
+    for (const sess of phase.sessions) {
+      const agent = agentByRole.get(sess.agentKey);
+      if (!agent) throw new Error(`Agent not found: ${sess.agentKey}`);
+      const res = await runner(agent, sess.name, sess.artifact);
+      if (!res.success) {
+        wf.failedPhase = phase.id;
+        updateRun(run);
+        return false;
+      }
+    }
+
+    wf.completedPhases.push(phase.id);
+    updateRun(run);
+  }
+
+  return true;
 }
 
 async function runSequentialPipeline(ctx: PipelineContext): Promise<boolean> {

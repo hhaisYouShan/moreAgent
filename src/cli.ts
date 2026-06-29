@@ -97,28 +97,46 @@ async function main(): Promise<void> {
 
       case 'start': {
         const useTmux = args.includes('--tmux');
+        const useResume = args.includes('--resume');
+        const fromPhaseIdx = args.indexOf('--from-phase');
+        const fromPhase = fromPhaseIdx !== -1 ? args[fromPhaseIdx + 1] : undefined;
 
         if (args.includes('--loop')) {
           await startCommand({ once: true, task: '', loop: true, tmux: useTmux });
           break;
         }
 
+        if (useResume) {
+          const resumeRunIdx = args.indexOf('--run');
+          const resumeRunId = resumeRunIdx !== -1 ? args[resumeRunIdx + 1] : undefined;
+          if (args.includes('--latest')) {
+            await startCommand({ once: true, task: '', resume: true });
+          } else if (resumeRunId) {
+            await startCommand({ once: true, task: '', resume: true, resumeRunId });
+          } else {
+            console.error('Error: --resume requires --run <id> or --latest');
+            process.exit(1);
+          }
+          break;
+        }
+
         if (!args.includes('--once')) {
-          console.error('Error: use --once or --loop with start command');
+          console.error('Error: use --once, --loop, or --resume with start command');
+          process.exit(1);
+        }
+
+        if (fromPhase && !args.includes('--task')) {
+          console.error('Error: --task is required with --from-phase');
           process.exit(1);
         }
 
         const taskIdx = args.indexOf('--task');
-        if (taskIdx === -1 || !args[taskIdx + 1]) {
-          console.error('Error: --task <description> is required');
-          process.exit(1);
-        }
-        const task = args[taskIdx + 1];
+        const task = taskIdx !== -1 ? args[taskIdx + 1] : '';
 
         const agentIdx = args.indexOf('--agent');
         const agent = agentIdx !== -1 ? args[agentIdx + 1] : undefined;
 
-        await startCommand({ once: true, task, agent, tmux: useTmux });
+        await startCommand({ once: true, task, agent, tmux: useTmux, fromPhase });
         break;
       }
 

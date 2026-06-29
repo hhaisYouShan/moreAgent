@@ -44,10 +44,18 @@ export interface Session {
 
 export type RunStatus = 'running' | 'completed' | 'failed';
 
+export interface WorkflowInfo {
+  profile: 'mvp' | 'full';
+  currentPhase?: string;
+  completedPhases: string[];
+  failedPhase?: string;
+}
+
 export interface Run {
   id: string;
   task: string;
   status: RunStatus;
+  workflow?: WorkflowInfo;
   createdAt: string;
   artifactDir: string;
   sessions: Session[];

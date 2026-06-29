@@ -50,6 +50,18 @@ function printLatestRun(run: Run): void {
   console.log(`  Run ID: ${run.id}`);
   console.log(`  Task: ${run.task}`);
   console.log(`  Status: ${run.status}`);
+  if (run.workflow) {
+    console.log(`  Workflow: ${run.workflow.profile} profile`);
+    if (run.workflow.currentPhase) {
+      console.log(`  Current Phase: ${run.workflow.currentPhase}`);
+    }
+    if (run.workflow.completedPhases.length > 0) {
+      console.log(`  Completed Phases: ${run.workflow.completedPhases.join(', ')}`);
+    }
+    if (run.workflow.failedPhase) {
+      console.log(`  Failed Phase: ${run.workflow.failedPhase}`);
+    }
+  }
   console.log(`  Created At: ${run.createdAt}`);
   console.log(`  Artifacts: ${run.artifactDir}`);
 
