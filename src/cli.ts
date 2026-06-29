@@ -4,7 +4,7 @@ import { cleanCommand } from './commands/clean';
 import { diffCommand } from './commands/diff';
 import { initCommand } from './commands/init';
 import { inspectCommand } from './commands/inspect';
-import { queueAddCommand, queueListCommand } from './commands/queue';
+import { queueAddCommand, queueListCommand, queueRecoverCommand, queueRetryCommand } from './commands/queue';
 import { statusCommand } from './commands/status';
 import { startCommand } from './commands/start';
 
@@ -38,7 +38,10 @@ Start Options:
 
 Queue Options:
   queue add --task <desc>   Add a new task to the pending queue
-  queue list                Show all tasks and their status
+  queue list                Show tasks (latest 20)
+  queue list --all          Show all tasks
+  queue recover             Mark interrupted running tasks as failed
+  queue retry --task <id>   Create a new pending task from a failed one
 
 Examples:
   moreagent init
@@ -110,9 +113,18 @@ async function main(): Promise<void> {
           }
           queueAddCommand({ task: args[qTaskIdx + 1] });
         } else if (sub === 'list') {
-          queueListCommand();
+          queueListCommand({ all: args.includes('--all') });
+        } else if (sub === 'recover') {
+          queueRecoverCommand();
+        } else if (sub === 'retry') {
+          const retryIdx = args.indexOf('--task');
+          if (retryIdx === -1 || !args[retryIdx + 1]) {
+            console.error('Error: --task <taskId> is required for queue retry');
+            process.exit(1);
+          }
+          queueRetryCommand({ task: args[retryIdx + 1] });
         } else {
-          console.error('Usage: moreagent queue <add|list>');
+          console.error('Usage: moreagent queue <add|list|recover|retry>');
           process.exit(1);
         }
         break;

@@ -43,10 +43,26 @@ export async function startCommand(options: StartOptions): Promise<void> {
 }
 
 async function loopCommand(): Promise<void> {
-  const { getNextPendingTask, markTaskRunning, markTaskCompleted, markTaskFailed } = require('../queue');
+  const {
+    getNextPendingTask,
+    markTaskRunning,
+    markTaskCompleted,
+    markTaskFailed,
+    hasRunningTasks,
+    checkInit,
+  } = require('../queue');
 
+  checkInit();
   const config = readConfig();
   assertRuntimeExecutable(config.runtime.opencodePath);
+
+  const runningCount = hasRunningTasks();
+  if (runningCount > 0) {
+    console.log(
+      `\nWarning: ${runningCount} running task(s) from a previous interrupted loop found.`
+    );
+    console.log('Run: moreagent queue recover\n');
+  }
 
   let processedCount = 0;
 
