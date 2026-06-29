@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { cleanCommand } from './commands/clean';
 import { initCommand } from './commands/init';
 import { statusCommand } from './commands/status';
 import { startCommand } from './commands/start';
@@ -15,6 +16,7 @@ Commands:
   init                      Initialize a new MoreAgent project
   start --once --task <...> Run a task through the agent pipeline
   status                    Show recent run status
+  clean                     Clean runs or worktrees
 
 Start Options:
   --once                    Run all agents once (required for MVP)
@@ -24,12 +26,20 @@ Start Options:
 Status Options:
   --latest                  Show the latest run in detail
 
+Clean Options:
+  --runs                    Clean .moreagent/runs and reset sessions.json
+  --worktrees               Clean .moreagent/worktrees
+  --all                     Clean both runs and worktrees
+
 Examples:
   moreagent init
   moreagent start --once --task "add user authentication"
   moreagent start --once --task "refactor database layer" --agent implementer
   moreagent status
   moreagent status --latest
+  moreagent clean --runs
+  moreagent clean --worktrees
+  moreagent clean --all
 `);
 }
 
@@ -72,6 +82,14 @@ async function main(): Promise<void> {
       case 'status':
         statusCommand({ latest: args.includes('--latest') });
         break;
+
+      case 'clean': {
+        const cleanRuns = args.includes('--runs') || args.includes('--all');
+        const cleanWorktrees =
+          args.includes('--worktrees') || args.includes('--all');
+        cleanCommand({ cleanRuns, cleanWorktrees });
+        break;
+      }
 
       default:
         console.error(`Unknown command: ${command}`);

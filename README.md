@@ -129,6 +129,26 @@ Show the latest run with per-session details:
 moreagent status --latest
 ```
 
+### Clean State
+
+Clean run artifacts and reset `sessions.json`:
+
+```bash
+moreagent clean --runs
+```
+
+Clean worktrees only:
+
+```bash
+moreagent clean --worktrees
+```
+
+Clean both runs and worktrees:
+
+```bash
+moreagent clean --all
+```
+
 ## Project Structure
 
 ```

@@ -23,6 +23,10 @@ export function writeSessions(data: SessionsData): void {
   fs.writeFileSync(sessionsPath, JSON.stringify(data, null, 2), 'utf-8');
 }
 
+export function resetSessions(): void {
+  writeSessions({ runs: [] });
+}
+
 export function addRun(run: Run): void {
   const data = readSessions();
   data.runs.push(run);
