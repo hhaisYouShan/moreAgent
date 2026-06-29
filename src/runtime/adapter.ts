@@ -45,6 +45,8 @@ export class OpenCodeRuntimeAdapter {
         cwd: workingDir,
       });
 
+      proc.stdin.end();
+
       const timer = setTimeout(() => {
         proc.kill('SIGTERM');
         resolve({
