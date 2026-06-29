@@ -59,6 +59,9 @@ export interface Run {
   createdAt: string;
   artifactDir: string;
   sessions: Session[];
+  mergedAt?: string;
+  mergedBranch?: string;
+  mergeCommit?: string;
 }
 
 export interface SessionsData {

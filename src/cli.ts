@@ -4,6 +4,7 @@ import { cleanCommand } from './commands/clean';
 import { diffCommand } from './commands/diff';
 import { initCommand, type InitProfile } from './commands/init';
 import { inspectCommand } from './commands/inspect';
+import { mergeCommand } from './commands/merge';
 import { queueAddCommand, queueListCommand, queueRecoverCommand, queueRetryCommand } from './commands/queue';
 import {
   sessionsListCommand,
@@ -211,6 +212,18 @@ async function main(): Promise<void> {
           console.error('Usage: moreagent sessions <list|reset|export>');
           process.exit(1);
         }
+        break;
+      }
+
+      case 'merge': {
+        const mergeRunIdx = args.indexOf('--run');
+        const mergeRunId = mergeRunIdx !== -1 ? args[mergeRunIdx + 1] : undefined;
+        mergeCommand({
+          run: mergeRunId,
+          latest: args.includes('--latest'),
+          apply: args.includes('--apply'),
+          dryRun: !args.includes('--apply'),
+        });
         break;
       }
 
