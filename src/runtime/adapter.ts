@@ -25,6 +25,8 @@ export class OpenCodeRuntimeAdapter {
     const { opencodePath, prompt, task, workingDir, timeout } = options;
     const effectiveTimeout = timeout || this.defaultTimeout;
 
+    this.ensureLogFiles(options.artifactDir);
+
     const fullPrompt = this.buildFullPrompt(
       prompt,
       task,
@@ -64,17 +66,18 @@ export class OpenCodeRuntimeAdapter {
         const chunk = data.toString();
         stdout += chunk;
         process.stdout.write(chunk);
+        this.appendLog(options.artifactDir, 'stdout.log', chunk);
       });
 
       proc.stderr?.on('data', (data: Buffer) => {
         const chunk = data.toString();
         stderr += chunk;
         process.stderr.write(chunk);
+        this.appendLog(options.artifactDir, 'stderr.log', chunk);
       });
 
       proc.on('close', (code) => {
         clearTimeout(timer);
-        this.writeLogs(options.artifactDir, stdout, stderr);
         resolve({
           success: code === 0,
           output: stdout,
@@ -85,7 +88,6 @@ export class OpenCodeRuntimeAdapter {
 
       proc.on('error', (err) => {
         clearTimeout(timer);
-        this.writeLogs(options.artifactDir, stdout, stderr);
         resolve({
           success: false,
           output: stdout,
@@ -164,17 +166,29 @@ export class OpenCodeRuntimeAdapter {
     return ['run', '--agent', agentName, prompt];
   }
 
-  private writeLogs(
-    artifactDir: string,
-    stdout: string,
-    stderr: string
-  ): void {
+  private ensureLogFiles(artifactDir: string): void {
     if (!fs.existsSync(artifactDir)) {
       fs.mkdirSync(artifactDir, { recursive: true });
     }
-    fs.writeFileSync(path.join(artifactDir, 'stdout.log'), stdout, 'utf-8');
-    if (stderr) {
-      fs.writeFileSync(path.join(artifactDir, 'stderr.log'), stderr, 'utf-8');
+    const stdoutPath = path.join(artifactDir, 'stdout.log');
+    const stderrPath = path.join(artifactDir, 'stderr.log');
+    if (!fs.existsSync(stdoutPath)) {
+      fs.writeFileSync(stdoutPath, '', 'utf-8');
+    }
+    if (!fs.existsSync(stderrPath)) {
+      fs.writeFileSync(stderrPath, '', 'utf-8');
+    }
+  }
+
+  private appendLog(
+    artifactDir: string,
+    filename: string,
+    chunk: string
+  ): void {
+    try {
+      fs.appendFileSync(path.join(artifactDir, filename), chunk, 'utf-8');
+    } catch {
+      // best-effort
     }
   }
 }

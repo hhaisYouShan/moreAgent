@@ -35,6 +35,7 @@ Start Options:
   --task <description>      The task to execute (required for --once)
   --agent <name>            Run a specific agent only (optional)
   --loop                    Process all pending tasks from the queue
+  --tmux                    Visualize execution in a tmux session
 
 Queue Options:
   queue add --task <desc>   Add a new task to the pending queue
@@ -79,8 +80,10 @@ async function main(): Promise<void> {
         break;
 
       case 'start': {
+        const useTmux = args.includes('--tmux');
+
         if (args.includes('--loop')) {
-          await startCommand({ once: true, task: '', loop: true });
+          await startCommand({ once: true, task: '', loop: true, tmux: useTmux });
           break;
         }
 
@@ -99,7 +102,7 @@ async function main(): Promise<void> {
         const agentIdx = args.indexOf('--agent');
         const agent = agentIdx !== -1 ? args[agentIdx + 1] : undefined;
 
-        await startCommand({ once: true, task, agent });
+        await startCommand({ once: true, task, agent, tmux: useTmux });
         break;
       }
 

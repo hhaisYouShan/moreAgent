@@ -10,6 +10,13 @@ import {
 } from '../session';
 import { writePrimaryArtifactTemplate, writeTaskMarkdown, updateArtifact } from '../artifacts';
 import { OpenCodeRuntimeAdapter } from '../runtime/adapter';
+import {
+  initTmux,
+  addAgentWindow,
+  killTmuxSession,
+  isTmuxAvailable,
+  type TmuxContext,
+} from '../tmux';
 import { Run, Session, AgentConfig } from '../types';
 
 export interface StartOptions {
@@ -17,6 +24,7 @@ export interface StartOptions {
   task: string;
   agent?: string;
   loop?: boolean;
+  tmux?: boolean;
 }
 
 export interface TaskRunResult {
@@ -30,7 +38,7 @@ const MAX_REPAIR_ROUNDS = 2;
 
 export async function startCommand(options: StartOptions): Promise<void> {
   if (options.loop) {
-    await loopCommand();
+    await loopCommand(options.tmux ?? false);
     return;
   }
 
@@ -42,7 +50,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
   }
 }
 
-async function loopCommand(): Promise<void> {
+async function loopCommand(tmux: boolean): Promise<void> {
   const {
     getNextPendingTask,
     markTaskRunning,
@@ -84,7 +92,7 @@ async function loopCommand(): Promise<void> {
     markTaskRunning(task.id);
 
     try {
-      const result = await runTaskOnce({ once: true, task: task.description });
+      const result = await runTaskOnce({ once: true, task: task.description, tmux });
       if (result.status === 'completed') {
         markTaskCompleted(task.id, result.runId);
         console.log(`Task ${task.id} completed (run ${result.runId})`);
@@ -111,6 +119,8 @@ export async function runTaskOnce(options: StartOptions): Promise<TaskRunResult>
 
   const runId = generateRunId();
   const runDir = path.join(getMoreAgentDir(), 'runs', runId);
+
+  const tmux = options.tmux ? initTmux(runId) : null;
 
   console.log(`Starting run: ${runId}`);
   console.log(`Task: ${options.task}`);
@@ -161,6 +171,7 @@ export async function runTaskOnce(options: StartOptions): Promise<TaskRunResult>
       agents,
       adapter,
       artifactContexts,
+      tmux,
     })
     : await runSequentialPipeline({
       config,
@@ -171,6 +182,7 @@ export async function runTaskOnce(options: StartOptions): Promise<TaskRunResult>
       agents,
       adapter,
       artifactContexts,
+      tmux,
     });
 
   run.status = pipelineSucceeded ? 'completed' : 'failed';
@@ -195,6 +207,7 @@ interface PipelineContext {
   agents: AgentConfig[];
   adapter: OpenCodeRuntimeAdapter;
   artifactContexts: string[];
+  tmux: TmuxContext | null;
 }
 
 interface AgentRunResult {
@@ -405,6 +418,12 @@ async function executeAgentSession(
   session.artifactDir = agentDir;
   session.worktreePath = workingDir !== process.cwd() ? workingDir : undefined;
   updateSession(ctx.run.id, session);
+
+  if (ctx.tmux) {
+    const stdoutPath = path.join(agentDir, 'stdout.log');
+    const stderrPath = path.join(agentDir, 'stderr.log');
+    addAgentWindow(ctx.tmux, sessionName, stdoutPath, stderrPath);
+  }
 
   try {
     const result = await ctx.adapter.execute({
