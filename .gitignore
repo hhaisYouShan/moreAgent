@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.moreagent/runs/
+.moreagent/worktrees/
+*.js.map
+*.d.ts
+*.d.ts.map

@@ -1,0 +1,89 @@
+# MoreAgent Configuration Example
+# Copy to .moreagent/config.yaml and customize
+
+version: "1.0"
+
+project:
+  name: "my-project"
+  description: "Project description"
+
+agents:
+  - name: architect
+    role: architect
+    description: "Designs the solution architecture and creates implementation plan"
+    canModifyCode: false
+    prompt: |
+      You are a senior software architect. Your role is to:
+      1. Analyze the task requirements
+      2. Design a clear solution architecture
+      3. Create a detailed implementation plan (brain-plan.md)
+      4. Break down the work into concrete steps for the implementer
+
+      Output your plan in brain-plan.md format with clear sections:
+      - Architecture overview
+      - Component design
+      - Data flow
+      - Step-by-step implementation plan
+
+  - name: implementer
+    role: implementer
+    description: "Implements the solution based on the architecture plan"
+    canModifyCode: true
+    branch: feature/implementation
+    prompt: |
+      You are a senior software developer. Your role is to:
+      1. Read the brain-plan.md from the architect
+      2. Implement the solution step by step
+      3. Write clean, well-structured code
+      4. Document your changes in implementation-result.md
+
+      Focus on:
+      - Following the architecture plan
+      - Writing idiomatic code
+      - Adding appropriate error handling
+      - Keeping changes minimal and focused
+
+    dependsOn: [architect]
+
+  - name: tester
+    role: tester
+    description: "Tests the implementation and reports results"
+    canModifyCode: true
+    branch: feature/tests
+    prompt: |
+      You are a QA engineer. Your role is to:
+      1. Review the implementation from the implementer
+      2. Write and run tests
+      3. Report test results in test-report.md
+
+      Focus on:
+      - Unit tests for new code
+      - Integration tests where appropriate
+      - Edge cases and error paths
+      - Test coverage assessment
+
+    dependsOn: [implementer]
+
+  - name: reviewer
+    role: reviewer
+    description: "Reviews code quality and test coverage"
+    canModifyCode: false
+    prompt: |
+      You are a senior code reviewer. Your role is to:
+      1. Review the implementation for correctness
+      2. Check code quality and best practices
+      3. Review test coverage
+      4. Provide actionable feedback in review-report.md
+
+      Focus on:
+      - Code correctness
+      - Performance implications
+      - Security considerations
+      - Maintainability
+
+    dependsOn: [tester]
+
+runtime:
+  opencodePath: "opencode"
+  timeout: 1800
+  maxRetries: 2

@@ -1,0 +1,25 @@
+{
+  "name": "moreagent",
+  "version": "0.1.0",
+  "description": "Multi-agent orchestration tool integrated with OpenCode CLI",
+  "main": "dist/cli.js",
+  "bin": {
+    "moreagent": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "start": "node dist/cli.js"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.0.0",
+    "@types/uuid": "^9.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}
