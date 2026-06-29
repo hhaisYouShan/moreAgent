@@ -263,6 +263,24 @@ Decision: CHANGES_REQUESTED
 # Tech Gate Review (Round 2)
 <!-- Final gate review -->
 `,
+  'failure-analysis.md': `Owner: frontend
+
+# Failure Analysis
+<!-- Brain must change the Owner line above to exactly one of:
+Owner: frontend
+Owner: backend
+Owner: tester
+Owner: product
+Owner: tech-plan
+Owner: unknown
+-->
+## Root Cause
+<!-- Analysis of what went wrong -->
+## Evidence
+<!-- Supporting evidence from logs and artifacts -->
+## Recommended Fix
+<!-- What should be done to resolve the issue -->
+`,
 
 };
 

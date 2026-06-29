@@ -46,6 +46,7 @@ export interface TaskRunResult {
 }
 
 const MAX_REPAIR_ROUNDS = 2;
+const MAX_FULL_REPAIR_ROUNDS = 2;
 
 export async function startCommand(options: StartOptions): Promise<void> {
   if (options.loop) {
@@ -414,6 +415,12 @@ async function executePhases(ctx: {
     } else if (phase.id === 'tech-gate') {
       const gateOk = await runTechGate(ctx, runner, readArtifact);
       if (!gateOk) { wf.failedPhase = phase.id; updateRun(run); return false; }
+    } else if (phase.id === 'test') {
+      const testOk = await runTestWithRepair(ctx, runner, readArtifact);
+      if (!testOk) { wf.failedPhase = phase.id; updateRun(run); return false; }
+    } else if (phase.id === 'review') {
+      const reviewOk = await runReviewWithRepair(ctx, runner, readArtifact);
+      if (!reviewOk) { wf.failedPhase = phase.id; updateRun(run); return false; }
     } else {
       for (const sess of phase.sessions) {
         const agent = agentByRole.get(sess.agentKey);
@@ -519,6 +526,210 @@ async function runTechGate(
 
   console.log('  Tech gate failed after maximum revision rounds.');
   return false;
+}
+
+type GateRunner = (
+  agent: AgentConfig,
+  name: string,
+  artifact: string,
+  ctx?: string | null,
+) => Promise<{ success: boolean; agentDir: string }>;
+
+async function runTestWithRepair(
+  ctx: Parameters<typeof executePhases>[0],
+  runner: GateRunner,
+  readArtifact: (dir: string, file: string) => string | null,
+): Promise<boolean> {
+  const tester = ctx.agentByRole.get('tester')!;
+  const frontend = ctx.agentByRole.get('frontend')!;
+  const backend = ctx.agentByRole.get('backend')!;
+
+  const runTest = async (name: string, artifact: string) => {
+    const res = await runner(tester, name, artifact);
+    if (!res.success) return { success: false, agentDir: res.agentDir };
+    return { success: true, agentDir: res.agentDir };
+  };
+
+  // First test run
+  const t1 = await runTest('tester', 'test-report.md');
+  if (t1.success) {
+    const decision = evaluateArtifactDecisionForFile(t1.agentDir, 'test-report.md');
+    if (decision.passed) return true;
+  } else {
+    return false;
+  }
+
+  // Repair loop
+  for (let round = 1; round <= MAX_FULL_REPAIR_ROUNDS; round++) {
+    const failureRes = await runFailureAnalysis(ctx, runner, 'test', round, readArtifact);
+    if (!failureRes.owner || failureRes.owner === 'unknown') {
+      console.log('  Failure analysis: owner unknown — stopping.');
+      return false;
+    }
+
+    const owner = failureRes.owner;
+    console.log(`  Test repair round ${round}: owner=${owner}`);
+
+    if (owner === 'frontend') {
+      await runner(frontend, `frontend-repair-${round}`, `frontend-repair-${round}.md`);
+    } else if (owner === 'backend') {
+      await runner(backend, `backend-repair-${round}`, `backend-repair-${round}.md`);
+    } else if (owner === 'tester') {
+      await runner(tester, `test-repair-${round}`, `test-repair-${round}.md`);
+    } else if (owner === 'tech-plan') {
+      await runner(frontend, `frontend-plan-revision-repair-${round}`, `frontend-plan-revision-repair-${round}.md`);
+      await runner(backend, `backend-plan-revision-repair-${round}`, `backend-plan-revision-repair-${round}.md`);
+      await runner(tester, `test-plan-revision-repair-${round}`, `test-plan-revision-repair-${round}.md`);
+    } else if (owner === 'product') {
+      const product = ctx.agentByRole.get('product')!;
+      await runner(product, `prd-revision-repair-${round}`, `prd-revision-repair-${round}.md`);
+    }
+
+    const retry = await runTest(`test-retry-${round}`, `test-report-retry-${round}.md`);
+    if (retry.success) {
+      const d = evaluateArtifactDecisionForFile(retry.agentDir, `test-report-retry-${round}.md`);
+      if (d.passed) return true;
+    }
+  }
+
+  return false;
+}
+
+async function runReviewWithRepair(
+  ctx: Parameters<typeof executePhases>[0],
+  runner: GateRunner,
+  readArtifact: (dir: string, file: string) => string | null,
+): Promise<boolean> {
+  const reviewer = ctx.agentByRole.get('reviewer')!;
+  const tester = ctx.agentByRole.get('tester')!;
+  const frontend = ctx.agentByRole.get('frontend')!;
+  const backend = ctx.agentByRole.get('backend')!;
+
+  const runReview = async (name: string, artifact: string) => {
+    const res = await runner(reviewer, name, artifact);
+    if (!res.success) return { success: false, agentDir: res.agentDir };
+    return { success: true, agentDir: res.agentDir };
+  };
+
+  const runTest = async (name: string, artifact: string) => {
+    const res = await runner(tester, name, artifact);
+    if (!res.success) return { success: false, agentDir: res.agentDir };
+    return { success: true, agentDir: res.agentDir };
+  };
+
+  // First review
+  const r1 = await runReview('reviewer', 'review-report.md');
+  if (r1.success) {
+    const d = evaluateArtifactDecisionForFile(r1.agentDir, 'review-report.md');
+    if (d.passed) return true;
+  } else {
+    return false;
+  }
+
+  // Repair loop
+  for (let round = 1; round <= MAX_FULL_REPAIR_ROUNDS; round++) {
+    const failureRes = await runFailureAnalysis(ctx, runner, 'review', round, readArtifact);
+    if (!failureRes.owner || failureRes.owner === 'unknown') {
+      console.log('  Failure analysis: owner unknown — stopping.');
+      return false;
+    }
+
+    const owner = failureRes.owner;
+    console.log(`  Review repair round ${round}: owner=${owner}`);
+
+    if (owner === 'frontend') {
+      await runner(frontend, `frontend-repair-${round}`, `frontend-repair-${round}.md`);
+    } else if (owner === 'backend') {
+      await runner(backend, `backend-repair-${round}`, `backend-repair-${round}.md`);
+    } else if (owner === 'tester') {
+      await runner(tester, `test-repair-${round}`, `test-repair-${round}.md`);
+    } else if (owner === 'tech-plan') {
+      await runner(frontend, `frontend-plan-revision-repair-${round}`, `frontend-plan-revision-repair-${round}.md`);
+      await runner(backend, `backend-plan-revision-repair-${round}`, `backend-plan-revision-repair-${round}.md`);
+      await runner(tester, `test-plan-revision-repair-${round}`, `test-plan-revision-repair-${round}.md`);
+    } else if (owner === 'product') {
+      const product = ctx.agentByRole.get('product')!;
+      await runner(product, `prd-revision-repair-${round}`, `prd-revision-repair-${round}.md`);
+    }
+
+    // Re-test, then re-review
+    const tRetry = await runTest(`test-retry-${round}`, `test-report-retry-${round}.md`);
+    if (!tRetry.success) continue;
+
+    const rRetry = await runReview(`review-retry-${round}`, `review-report-retry-${round}.md`);
+    if (rRetry.success) {
+      const d = evaluateArtifactDecisionForFile(rRetry.agentDir, `review-report-retry-${round}.md`);
+      if (d.passed) return true;
+    }
+  }
+
+  return false;
+}
+
+async function runFailureAnalysis(
+  ctx: Parameters<typeof executePhases>[0],
+  runner: GateRunner,
+  trigger: 'test' | 'review',
+  round: number,
+  readArtifact: (dir: string, file: string) => string | null,
+): Promise<{ owner: string | null }> {
+  const brain = ctx.agentByRole.get('brain')!;
+  const frontend = ctx.agentByRole.get('frontend')!;
+  const backend = ctx.agentByRole.get('backend')!;
+  const tester = ctx.agentByRole.get('tester')!;
+
+  const testDir = ctx.run.sessions.find((s) => s.agentName === 'tester')?.artifactDir ?? '';
+  const reviewDir = ctx.run.sessions.find((s) => s.agentName === 'reviewer')?.artifactDir ?? '';
+  const feImplDir = ctx.run.sessions.find((s) => s.agentName === 'frontend-implementation')?.artifactDir ?? '';
+  const beImplDir = ctx.run.sessions.find((s) => s.agentName === 'backend-implementation')?.artifactDir ?? '';
+
+  const context = [
+    `Task: ${ctx.options.task}`,
+    trigger === 'test'
+      ? readArtifact(testDir, 'test-report.md')
+      : readArtifact(reviewDir, 'review-report.md'),
+    readArtifact(feImplDir, 'frontend-implementation.md'),
+    readArtifact(beImplDir, 'backend-implementation.md'),
+  ].filter(Boolean).join('\n\n---\n\n');
+
+  const sessionName = `failure-analysis-${trigger}-${round}`;
+  const res = await runner(brain, sessionName, 'failure-analysis.md', context);
+  if (!res.success) return { owner: null };
+
+  const content = readArtifact(res.agentDir, 'failure-analysis.md');
+  if (!content) return { owner: null };
+
+  const match = content.match(/^Owner:\s*(\S+)/m);
+  if (!match) return { owner: null };
+
+  const valid = ['frontend', 'backend', 'tester', 'product', 'tech-plan', 'unknown'];
+  return { owner: valid.includes(match[1]) ? match[1] : null };
+}
+
+function evaluateArtifactDecisionForFile(agentDir: string, fileName: string): ArtifactDecision {
+  if (fileName.includes('test-report')) {
+    const content = readArtifactFromDir(agentDir, fileName);
+    if (!content) return { passed: true };
+    if (/^Result:\s*FAIL\s*$/im.test(content)) {
+      return { passed: false, reason: `Artifact decision: ${fileName} contains "Result: FAIL"` };
+    }
+    if (/^Result:\s*PASS\s*$/im.test(content)) {
+      return { passed: true };
+    }
+    return { passed: true };
+  }
+  if (fileName.includes('review-report')) {
+    const content = readArtifactFromDir(agentDir, fileName);
+    if (!content) return { passed: true };
+    if (/^Decision:\s*CHANGES_REQUESTED\s*$/im.test(content)) {
+      return { passed: false, reason: `Artifact decision: ${fileName} contains "Decision: CHANGES_REQUESTED"` };
+    }
+    if (/^Decision:\s*APPROVED\s*$/im.test(content)) {
+      return { passed: true };
+    }
+    return { passed: true };
+  }
+  return { passed: true };
 }
 
 async function runSequentialPipeline(ctx: PipelineContext): Promise<boolean> {
