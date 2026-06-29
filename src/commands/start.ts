@@ -428,6 +428,7 @@ async function executeAgentSession(
       opencodePath: ctx.config.runtime.opencodePath,
       agentName: agent.name,
       sessionId: session.id,
+      runtimeSessionId: session.runtimeSessionId,
       prompt: agent.prompt,
       task: ctx.options.task,
       primaryArtifact,
@@ -449,6 +450,24 @@ async function executeAgentSession(
 
     session.status = 'completed';
     session.completedAt = new Date().toISOString();
+
+    if (!session.runtimeSessionId && sessionName.startsWith('repair-')) {
+      const baseRole = sessionName.replace(/^repair-\d+-/, '');
+      const baseSession = ctx.run.sessions.find(
+        (s) => s.agentName === baseRole && s.runtimeSessionId
+      );
+      if (baseSession?.runtimeSessionId) {
+        session.runtimeSessionId = baseSession.runtimeSessionId;
+      }
+    }
+
+    if (!session.runtimeSessionId) {
+      const captured = ctx.adapter.captureRuntimeSessionId(session.id);
+      if (captured) {
+        session.runtimeSessionId = captured;
+      }
+    }
+
     writeOutputToArtifactIfNeeded(agent, agentDir, result.output);
     const artifactContent = readPrimaryArtifact(agent, agentDir);
     const artifactDecision = evaluateArtifactDecision(agent, agentDir);

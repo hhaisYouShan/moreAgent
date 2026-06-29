@@ -1,12 +1,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { spawn } from 'child_process';
+import { spawn, spawnSync } from 'child_process';
 import { AgentResult } from '../types';
 
 export interface AdapterOptions {
   opencodePath: string;
   agentName: string;
   sessionId: string;
+  runtimeSessionId?: string;
   prompt: string;
   task: string;
   primaryArtifact: string;
@@ -39,7 +40,8 @@ export class OpenCodeRuntimeAdapter {
     const args = this.buildArgs(
       fullPrompt,
       options.agentName,
-      options.sessionId
+      options.sessionId,
+      options.runtimeSessionId
     );
 
     return new Promise<AgentResult>((resolve) => {
@@ -160,10 +162,16 @@ export class OpenCodeRuntimeAdapter {
   private buildArgs(
     prompt: string,
     agentName: string,
-    sessionId: string
+    sessionId: string,
+    runtimeSessionId?: string
   ): string[] {
-    void sessionId;
-    return ['run', '--agent', agentName, prompt];
+    const args: string[] = ['run', '--agent', agentName];
+    if (runtimeSessionId) {
+      args.push('-s', runtimeSessionId);
+    }
+    args.push('--title', `moreagent-${sessionId}`);
+    args.push(prompt);
+    return args;
   }
 
   private ensureLogFiles(artifactDir: string): void {
@@ -189,6 +197,28 @@ export class OpenCodeRuntimeAdapter {
       fs.appendFileSync(path.join(artifactDir, filename), chunk, 'utf-8');
     } catch {
       // best-effort
+    }
+  }
+
+  public captureRuntimeSessionId(moreagentSessionId: string): string | null {
+    try {
+      const result = spawnSync(
+        'opencode',
+        ['session', 'list', '--print-logs'],
+        { stdio: 'pipe', encoding: 'utf-8' }
+      );
+      const title = `moreagent-${moreagentSessionId}`;
+      for (const line of result.stdout.split('\n')) {
+        if (line.includes(title)) {
+          const match = line.match(/^\S+/);
+          if (match) {
+            return match[0];
+          }
+        }
+      }
+      return null;
+    } catch {
+      return null;
     }
   }
 }

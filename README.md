@@ -372,6 +372,33 @@ chmod +x dist/cli.js
 npm link
 ```
 
+## OpenCode Native Session Support
+
+OpenCode supports native session resume with `-s <sessionId>`. MoreAgent leverages this:
+
+| Feature | OpenCode Command | MoreAgent Behavior |
+|---|---|---|
+| New session | `opencode run --agent <name>` | First agent call; session ID captured via `opencode session list` |
+| Continue session | `opencode run -s <id> --agent <name>` | Repair rounds reuse the base agent's session ID |
+| Session labeling | `--title "moreagent-<sessionId>"` | Predictable session names for discovery |
+
+Session IDs are stored in `.moreagent/sessions.json` under `runtimeSessionId`.
+
+**Current session model:**
+- **MoreAgent session** (`.moreagent/sessions.json`): orchestration-layer record — one per agent execution within a run
+- **OpenCode session** (native SQLite store): conversation history — captured and reused across repair rounds
+
+See `docs/opencode-session-research.md` for full details.
+
+### Recoverable State
+
+After a run (completed or interrupted), the following is preserved:
+- `.moreagent/sessions.json` — run and session status with OpenCode session IDs
+- `.moreagent/runs/<runId>/` — artifact reports per agent
+- `stdout.log` / `stderr.log` — full agent output logs
+- `.moreagent/worktrees/agent-<runId>/` — code changes on task branch
+- OpenCode native sessions — recoverable via `opencode session list` and `opencode run -s <id>`
+
 ## License
 
 MIT

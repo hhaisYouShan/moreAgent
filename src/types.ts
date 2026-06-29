@@ -33,6 +33,7 @@ export interface Session {
   agentName: string;
   runId: string;
   status: SessionStatus;
+  runtimeSessionId?: string;
   worktreePath?: string;
   artifactDir: string;
   startedAt: string;
