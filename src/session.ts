@@ -49,3 +49,39 @@ export function updateSession(runId: string, session: Session): void {
   }
   writeSessions(data);
 }
+
+export function markRunningRunsAsStaleFailure(): number {
+  const data = readSessions();
+  let updatedCount = 0;
+  const now = new Date().toISOString();
+
+  for (const run of data.runs) {
+    if (run.status !== 'running') {
+      continue;
+    }
+
+    let runWasUpdated = false;
+
+    for (const session of run.sessions) {
+      if (session.status !== 'running') {
+        continue;
+      }
+
+      session.status = 'failed';
+      session.error = session.error || 'Marked stale before starting a new run';
+      session.completedAt = session.completedAt || now;
+      runWasUpdated = true;
+    }
+
+    if (runWasUpdated) {
+      run.status = 'failed';
+      updatedCount += 1;
+    }
+  }
+
+  if (updatedCount > 0) {
+    writeSessions(data);
+  }
+
+  return updatedCount;
+}

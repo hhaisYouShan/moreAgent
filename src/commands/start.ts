@@ -2,7 +2,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { readConfig, getMoreAgentDir } from '../config';
-import { addRun, updateRun, updateSession } from '../session';
+import {
+  addRun,
+  updateRun,
+  updateSession,
+  markRunningRunsAsStaleFailure,
+} from '../session';
 import { writeAllArtifactTemplates, writeTaskMarkdown, updateArtifact } from '../artifacts';
 import { OpenCodeRuntimeAdapter } from '../runtime/adapter';
 import { Run, Session, AgentConfig } from '../types';
@@ -15,6 +20,12 @@ export interface StartOptions {
 
 export async function startCommand(options: StartOptions): Promise<void> {
   const config = readConfig();
+  const staleRuns = markRunningRunsAsStaleFailure();
+  if (staleRuns > 0) {
+    console.log(`Marked ${staleRuns} stale running run(s) as failed.`);
+  }
+  assertRuntimeExecutable(config.runtime.opencodePath);
+
   const runId = generateRunId();
   const runDir = path.join(getMoreAgentDir(), 'runs', runId);
 
@@ -184,9 +195,7 @@ function createTaskWorktree(runId: string): string | null {
     console.log(`  Branch: ${branchName}\n`);
     return worktreePath;
   } catch (err: any) {
-    console.log(`  Warning: Could not create git worktree: ${err.message}`);
-    console.log(`  Code-modifying agents will run in current directory.\n`);
-    return null;
+    throw new Error(`Could not create git worktree: ${err.message}`);
   }
 }
 
@@ -206,10 +215,71 @@ function resolveWorkingDir(
   agent: AgentConfig,
   taskWorktree: string | null
 ): string {
-  if (agent.canModifyCode && taskWorktree) {
+  if (taskWorktree && (agent.canModifyCode || agent.role === 'reviewer')) {
     return taskWorktree;
   }
   return process.cwd();
+}
+
+function assertRuntimeExecutable(command: string): void {
+  if (command.includes(path.sep)) {
+    assertExecutablePath(command);
+    return;
+  }
+
+  const pathValue = process.env.PATH || '';
+  const searchPaths = pathValue.split(path.delimiter).filter(Boolean);
+  for (const dir of searchPaths) {
+    const candidate = path.join(dir, command);
+    if (fs.existsSync(candidate) && isExecutable(candidate)) {
+      return;
+    }
+  }
+
+  if (process.platform === 'win32') {
+    const pathExt = (process.env.PATHEXT || '.EXE;.CMD;.BAT;.COM')
+      .split(';')
+      .filter(Boolean);
+    for (const dir of searchPaths) {
+      for (const ext of pathExt) {
+        const candidate = path.join(dir, `${command}${ext}`);
+        if (fs.existsSync(candidate)) {
+          return;
+        }
+      }
+    }
+  }
+
+  throw new Error(
+    `OpenCode executable not found: "${command}". Update runtime.opencodePath in .moreagent/config.yaml or add it to PATH.`
+  );
+}
+
+function assertExecutablePath(commandPath: string): void {
+  const resolvedPath = path.resolve(commandPath);
+  if (!fs.existsSync(resolvedPath)) {
+    throw new Error(
+      `OpenCode executable not found at "${resolvedPath}". Update runtime.opencodePath in .moreagent/config.yaml.`
+    );
+  }
+  if (!isExecutable(resolvedPath)) {
+    throw new Error(
+      `OpenCode executable is not runnable at "${resolvedPath}". Update runtime.opencodePath in .moreagent/config.yaml.`
+    );
+  }
+}
+
+function isExecutable(filePath: string): boolean {
+  if (process.platform === 'win32') {
+    return true;
+  }
+
+  try {
+    fs.accessSync(filePath, fs.constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function buildContext(artifactContexts: string[]): string {

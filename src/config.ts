@@ -14,6 +14,10 @@ export function getConfigPath(): string {
   return path.join(getMoreAgentDir(), CONFIG_FILE);
 }
 
+export function getOpenCodeAgentsDir(): string {
+  return path.resolve(process.cwd(), '.opencode', 'agents');
+}
+
 export function configExists(): boolean {
   return fs.existsSync(getConfigPath());
 }

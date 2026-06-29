@@ -56,11 +56,15 @@ export class OpenCodeRuntimeAdapter {
       }, effectiveTimeout * 1000);
 
       proc.stdout?.on('data', (data: Buffer) => {
-        stdout += data.toString();
+        const chunk = data.toString();
+        stdout += chunk;
+        process.stdout.write(chunk);
       });
 
       proc.stderr?.on('data', (data: Buffer) => {
-        stderr += data.toString();
+        const chunk = data.toString();
+        stderr += chunk;
+        process.stderr.write(chunk);
       });
 
       proc.on('close', (code) => {
@@ -121,7 +125,8 @@ export class OpenCodeRuntimeAdapter {
     agentName: string,
     sessionId: string
   ): string[] {
-    return ['run', '--agent', agentName, '--session', sessionId, prompt];
+    void sessionId;
+    return ['run', '--agent', agentName, prompt];
   }
 
   private writeLogs(

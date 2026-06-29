@@ -1,6 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { getMoreAgentDir, configExists } from '../config';
+import {
+  getMoreAgentDir,
+  configExists,
+  getOpenCodeAgentsDir,
+} from '../config';
 
 const DEFAULT_CONFIG = `# MoreAgent Configuration
 version: "1.0"
@@ -52,11 +56,48 @@ runtime:
   maxRetries: 2
 `;
 
+function buildOpenCodeAgentFile(
+  name: string,
+  description: string,
+  prompt: string
+): string {
+  return `---
+description: ${description}
+---
+
+${prompt}
+`;
+}
+
+const DEFAULT_OPENCODE_AGENTS: Record<string, string> = {
+  architect: buildOpenCodeAgentFile(
+    'architect',
+    'Designs architecture and creates implementation plans.',
+    'You are a senior software architect. Analyze the task, design the solution architecture, and create a detailed implementation plan.'
+  ),
+  implementer: buildOpenCodeAgentFile(
+    'implementer',
+    'Implements the solution based on the architecture plan.',
+    'You are a senior software developer. Implement the solution based on the architect plan. Keep changes minimal and focused.'
+  ),
+  tester: buildOpenCodeAgentFile(
+    'tester',
+    'Tests the implementation and reports results.',
+    'You are a QA engineer. Verify the implementation, run tests, and report pass/fail status with evidence.'
+  ),
+  reviewer: buildOpenCodeAgentFile(
+    'reviewer',
+    'Reviews the final implementation and test coverage.',
+    'You are a senior code reviewer. Review the final diff, identify risks, and provide actionable findings.'
+  ),
+};
+
 export function initCommand(): void {
   const dir = getMoreAgentDir();
 
   if (fs.existsSync(dir)) {
     console.log(`.moreagent/ already exists at ${dir}`);
+    ensureOpenCodeAgents();
     if (configExists()) {
       console.log('Config already exists. Run "moreagent start" to begin.');
       return;
@@ -68,6 +109,7 @@ export function initCommand(): void {
   fs.mkdirSync(dir, { recursive: true });
   fs.mkdirSync(path.join(dir, 'runs'), { recursive: true });
   fs.mkdirSync(path.join(dir, 'worktrees'), { recursive: true });
+  ensureOpenCodeAgents();
 
   const configPath = path.join(dir, 'config.yaml');
   if (!fs.existsSync(configPath)) {
@@ -89,6 +131,19 @@ export function initCommand(): void {
   console.log('  sessions.json   — Session tracking');
   console.log('  runs/           — Run output directory');
   console.log('  worktrees/      — Git worktree directory');
+  console.log('  .opencode/agents/ — OpenCode agent definitions');
   console.log('\nNext: edit config.yaml with your project details, then run:');
   console.log('  moreagent start --once --task "your task description"');
+}
+
+function ensureOpenCodeAgents(): void {
+  const agentsDir = getOpenCodeAgentsDir();
+  fs.mkdirSync(agentsDir, { recursive: true });
+
+  for (const [name, content] of Object.entries(DEFAULT_OPENCODE_AGENTS)) {
+    const agentPath = path.join(agentsDir, `${name}.md`);
+    if (!fs.existsSync(agentPath)) {
+      fs.writeFileSync(agentPath, content, 'utf-8');
+    }
+  }
 }
