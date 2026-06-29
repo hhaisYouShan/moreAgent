@@ -1,5 +1,4 @@
 import * as fs from 'fs';
-import * as path from 'path';
 import { execSync } from 'child_process';
 import { readSessions } from '../session';
 import { Run } from '../types';
@@ -40,6 +39,10 @@ export function diffCommand(options: DiffOptions = {}): void {
       encoding: 'utf-8',
     });
     console.log(status || '(no changes)');
+    if (status && status.includes('??')) {
+      console.log('(Note: ?? files are untracked and will NOT appear in git diff below.');
+      console.log(' Run "git add" in the worktree to stage them first.)');
+    }
   } catch (err: any) {
     console.log(`Error running git status: ${err.message}`);
   }

@@ -5,6 +5,7 @@ import {
   configExists,
   getOpenCodeAgentsDir,
 } from '../config';
+import { initTasksFile } from '../queue';
 
 const DEFAULT_CONFIG = `# MoreAgent Configuration
 version: "1.0"
@@ -98,6 +99,7 @@ export function initCommand(): void {
   if (fs.existsSync(dir)) {
     console.log(`.moreagent/ already exists at ${dir}`);
     ensureOpenCodeAgents();
+    initTasksFile();
     if (configExists()) {
       console.log('Config already exists. Run "moreagent start" to begin.');
       return;
@@ -125,10 +127,13 @@ export function initCommand(): void {
     );
   }
 
+  initTasksFile();
+
   console.log(`\nInitialized at ${dir}`);
   console.log('Created:');
   console.log('  config.yaml     — Agent and runtime configuration');
   console.log('  sessions.json   — Session tracking');
+  console.log('  tasks.json      — Task queue');
   console.log('  runs/           — Run output directory');
   console.log('  worktrees/      — Git worktree directory');
   console.log('  .opencode/agents/ — OpenCode agent definitions');

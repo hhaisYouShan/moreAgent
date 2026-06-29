@@ -16,11 +16,76 @@ export interface StartOptions {
   once: boolean;
   task: string;
   agent?: string;
+  loop?: boolean;
+}
+
+export interface TaskRunResult {
+  runId: string;
+  status: 'completed' | 'failed';
+  artifactDir: string;
+  worktreePath: string | null;
 }
 
 const MAX_REPAIR_ROUNDS = 2;
 
 export async function startCommand(options: StartOptions): Promise<void> {
+  if (options.loop) {
+    await loopCommand();
+    return;
+  }
+
+  const result = await runTaskOnce(options);
+  console.log(`Run ${result.runId} ${result.status}`);
+  console.log(`Artifacts: ${result.artifactDir}`);
+  if (result.worktreePath) {
+    console.log(`Worktree: ${result.worktreePath}`);
+  }
+}
+
+async function loopCommand(): Promise<void> {
+  const { getNextPendingTask, markTaskRunning, markTaskCompleted, markTaskFailed } = require('../queue');
+
+  const config = readConfig();
+  assertRuntimeExecutable(config.runtime.opencodePath);
+
+  let processedCount = 0;
+
+  while (true) {
+    const task = getNextPendingTask();
+    if (!task) {
+      if (processedCount === 0) {
+        console.log('No pending tasks in queue.');
+        console.log('Add one with: moreagent queue add --task "your task"');
+      } else {
+        console.log(`\nAll ${processedCount} pending task(s) processed. Queue is empty.`);
+      }
+      return;
+    }
+
+    console.log(`\n=== Processing task: ${task.id} ===`);
+    console.log(`Description: ${task.description}`);
+
+    markTaskRunning(task.id);
+
+    try {
+      const result = await runTaskOnce({ once: true, task: task.description });
+      if (result.status === 'completed') {
+        markTaskCompleted(task.id, result.runId);
+        console.log(`Task ${task.id} completed (run ${result.runId})`);
+      } else {
+        markTaskFailed(task.id, result.runId, 'Run failed');
+        console.log(`Task ${task.id} failed (run ${result.runId})`);
+      }
+    } catch (err: any) {
+      markTaskFailed(task.id, '', err.message);
+      console.log(`Task ${task.id} error: ${err.message}`);
+    }
+
+    processedCount++;
+  }
+}
+
+export async function runTaskOnce(options: StartOptions): Promise<TaskRunResult> {
   const config = readConfig();
   const staleRuns = markRunningRunsAsStaleFailure();
   if (staleRuns > 0) {
@@ -95,12 +160,14 @@ export async function startCommand(options: StartOptions): Promise<void> {
   run.status = pipelineSucceeded ? 'completed' : 'failed';
   updateRun(run);
 
-  console.log(`Run ${runId} ${run.status}`);
-  console.log(`Artifacts: ${runDir}`);
-  if (taskWorktree) {
-    console.log(`Worktree: ${taskWorktree}`);
-  }
   printSummary(sessions);
+
+  return {
+    runId,
+    status: run.status as 'completed' | 'failed',
+    artifactDir: runDir,
+    worktreePath: taskWorktree,
+  };
 }
 
 interface PipelineContext {

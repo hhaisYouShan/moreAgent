@@ -4,6 +4,7 @@ import { cleanCommand } from './commands/clean';
 import { diffCommand } from './commands/diff';
 import { initCommand } from './commands/init';
 import { inspectCommand } from './commands/inspect';
+import { queueAddCommand, queueListCommand } from './commands/queue';
 import { statusCommand } from './commands/status';
 import { startCommand } from './commands/start';
 
@@ -17,6 +18,9 @@ Usage:
 Commands:
   init                      Initialize a new MoreAgent project
   start --once --task <...> Run a task through the agent pipeline
+  start --loop              Process all pending tasks in the queue
+  queue add --task <...>    Add a task to the queue
+  queue list                List all tasks in the queue
   status                    Show recent run status
   status --latest           Show the latest run in detail
   diff                      Show worktree git diff for the latest run
@@ -27,26 +31,22 @@ Commands:
   clean                     Clean runs or worktrees
 
 Start Options:
-  --once                    Run all agents once (required for MVP)
-  --task <description>      The task to execute
+  --once                    Run a single task (requires --task)
+  --task <description>      The task to execute (required for --once)
   --agent <name>            Run a specific agent only (optional)
+  --loop                    Process all pending tasks from the queue
 
-Diff Options:
-  --run <runId>             Show diff for a specific run (default: latest)
-
-Inspect Options:
-  --run <runId>             Show a specific run (default: latest)
-  --agent <name>            Show a specific agent's primary artifact
-
-Clean Options:
-  --runs                    Clean .moreagent/runs and reset sessions.json
-  --worktrees               Clean .moreagent/worktrees
-  --all                     Clean both runs and worktrees
+Queue Options:
+  queue add --task <desc>   Add a new task to the pending queue
+  queue list                Show all tasks and their status
 
 Examples:
   moreagent init
   moreagent start --once --task "add user authentication"
   moreagent start --once --task "refactor database layer" --agent implementer
+  moreagent start --loop
+  moreagent queue add --task "update README usage section"
+  moreagent queue list
   moreagent status
   moreagent status --latest
   moreagent diff
@@ -76,8 +76,13 @@ async function main(): Promise<void> {
         break;
 
       case 'start': {
+        if (args.includes('--loop')) {
+          await startCommand({ once: true, task: '', loop: true });
+          break;
+        }
+
         if (!args.includes('--once')) {
-          console.error('Error: --once flag is required for start command');
+          console.error('Error: use --once or --loop with start command');
           process.exit(1);
         }
 
@@ -92,6 +97,24 @@ async function main(): Promise<void> {
         const agent = agentIdx !== -1 ? args[agentIdx + 1] : undefined;
 
         await startCommand({ once: true, task, agent });
+        break;
+      }
+
+      case 'queue': {
+        const sub = args[1];
+        if (sub === 'add') {
+          const qTaskIdx = args.indexOf('--task');
+          if (qTaskIdx === -1 || !args[qTaskIdx + 1]) {
+            console.error('Error: --task <description> is required for queue add');
+            process.exit(1);
+          }
+          queueAddCommand({ task: args[qTaskIdx + 1] });
+        } else if (sub === 'list') {
+          queueListCommand();
+        } else {
+          console.error('Usage: moreagent queue <add|list>');
+          process.exit(1);
+        }
         break;
       }
 
