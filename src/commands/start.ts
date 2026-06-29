@@ -184,6 +184,8 @@ function createTaskWorktree(runId: string): string | null {
     return worktreePath;
   }
 
+  ensureRepoHasCommits();
+
   try {
     const { execSync } = require('child_process');
     const baseBranch = getCurrentBranch();
@@ -195,7 +197,34 @@ function createTaskWorktree(runId: string): string | null {
     console.log(`  Branch: ${branchName}\n`);
     return worktreePath;
   } catch (err: any) {
-    throw new Error(`Could not create git worktree: ${err.message}`);
+    console.log(`  Warning: Could not create git worktree: ${err.message}`);
+    console.log(`  Code-modifying agents will run in current directory.\n`);
+    return null;
+  }
+}
+
+function ensureRepoHasCommits(): void {
+  try {
+    const { execSync } = require('child_process');
+    execSync('git rev-parse HEAD', {
+      cwd: process.cwd(),
+      stdio: 'pipe',
+    });
+  } catch {
+    console.log('  No commits found. Creating initial commit for worktree support...');
+    try {
+      const { execSync } = require('child_process');
+      execSync('git add -A', { cwd: process.cwd(), stdio: 'pipe' });
+      execSync('git commit -m "Initial commit (moreagent worktree baseline)"', {
+        cwd: process.cwd(),
+        stdio: 'pipe',
+      });
+      console.log('  Initial commit created.\n');
+    } catch (err: any) {
+      throw new Error(
+        `Cannot create git worktree: no commits in repository and failed to create initial commit (${err.message}). Run "git add . && git commit -m Initial" first.`
+      );
+    }
   }
 }
 
