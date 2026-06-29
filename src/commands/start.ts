@@ -97,6 +97,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
         workingDir,
         artifactDir: agentDir,
         timeout: config.runtime.timeout,
+        canModifyCode: agent.canModifyCode,
         context,
       });
 

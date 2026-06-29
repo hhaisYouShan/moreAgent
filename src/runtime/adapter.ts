@@ -13,6 +13,7 @@ export interface AdapterOptions {
   workingDir: string;
   artifactDir: string;
   timeout: number;
+  canModifyCode: boolean;
   context?: string;
 }
 
@@ -29,6 +30,8 @@ export class OpenCodeRuntimeAdapter {
       task,
       options.artifactDir,
       options.primaryArtifact,
+      options.workingDir,
+      options.canModifyCode,
       options.context
     );
     const args = this.buildArgs(
@@ -98,6 +101,8 @@ export class OpenCodeRuntimeAdapter {
     task: string,
     artifactDir: string,
     primaryArtifact: string,
+    workingDir: string,
+    isCodeModifier: boolean,
     context?: string
   ): string {
     const primaryPath = path.join(artifactDir, primaryArtifact);
@@ -106,18 +111,33 @@ export class OpenCodeRuntimeAdapter {
 
     full += `\n\n## Task\n${task}`;
 
-    full += `\n\n## Artifact Output\nYour primary output file is: ${primaryPath}`;
-    full += `\nYou MUST write your complete deliverable to this file.`;
-    full += `\nAll artifact files are in: ${artifactDir}`;
+    full += `\n\n## Directory Layout`;
+    full += `\n- Code workspace root (project root): ${workingDir}`;
+    full += `\n- Artifact output directory (deliverables only): ${artifactDir}`;
+    full += `\n- Primary deliverable file: ${primaryPath}`;
+    full += `\nThese are DIFFERENT directories. Do NOT mix them up.`;
+
+    if (isCodeModifier) {
+      full += `\n\n## Code Modification Rules`;
+      full += `\n- All code files MUST be written to the Code workspace root: ${workingDir}`;
+      full += `\n- Use relative paths like "README.md" or "src/foo.ts", resolved from ${workingDir}`;
+      full += `\n- NEVER write code files to the artifact directory or any other path outside ${workingDir}`;
+      full += `\n- Do NOT use the original repository path as the project root.`;
+    }
+
+    full += `\n\n## Artifact Rules`;
+    full += `\n- Write your analysis/report/deliverable ONLY to: ${primaryPath}`;
+    full += `\n- Logs and side-output go to files under: ${artifactDir}`;
+    full += `\n- Code changes go to: ${workingDir}`;
 
     if (context) {
       full += `\n\n## Context from Previous Agents\n${context}`;
     }
 
     full += `\n\n## Instructions`;
-    full += `\n1. Execute the task within the working directory.`;
-    full += `\n2. Write your final deliverable to: ${primaryPath}`;
-    full += `\n3. Use absolute paths when writing files.`;
+    full += `\n1. Your working directory IS the code workspace root.`;
+    full += `\n2. Write code using relative paths (e.g. "src/foo.ts") — they resolve to ${workingDir}.`;
+    full += `\n3. Write your deliverable to: ${primaryPath}`;
 
     return full;
   }
