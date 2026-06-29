@@ -54,6 +54,10 @@ Run the full 4-agent pipeline (architect → implementer → tester → reviewer
 moreagent start --once --task "add a dark mode toggle to settings"
 ```
 
+If `tester` fails, MoreAgent will retry from `implementer` and then rerun `tester`.
+If `reviewer` fails, MoreAgent will retry from `implementer` and then rerun `tester` and `reviewer`.
+The MVP retries at most 2 repair rounds in the same task worktree. It does not auto-merge or auto-push.
+
 Example output:
 
 ```
@@ -111,6 +115,11 @@ Each run produces artifacts under `.moreagent/runs/<run-id>/`:
 └── reviewer/
     ├── task.md
     └── review-report.md          # Code review findings
+
+# Repair attempts use separate directories
+# repair-1-implementer/
+# repair-1-tester/
+# repair-1-reviewer/
 ```
 
 Sessions are tracked in `.moreagent/sessions.json` for history and debugging.
