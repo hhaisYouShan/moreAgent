@@ -13,8 +13,6 @@ import { OpenCodeRuntimeAdapter } from '../runtime/adapter';
 import {
   initTmux,
   addAgentWindow,
-  killTmuxSession,
-  isTmuxAvailable,
   type TmuxContext,
 } from '../tmux';
 import { Run, Session, AgentConfig } from '../types';
