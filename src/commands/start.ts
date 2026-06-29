@@ -32,7 +32,8 @@ export async function startCommand(options: StartOptions): Promise<void> {
     throw new Error(`No agent found with name "${options.agent}"`);
   }
 
-  const taskWorktree = createTaskWorktree(runId);
+  const needsWorktree = agents.some((a) => a.canModifyCode);
+  const taskWorktree = needsWorktree ? createTaskWorktree(runId) : null;
 
   const run: Run = {
     id: runId,
@@ -87,7 +88,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
 
       if (result.success) {
         session.status = 'completed';
-        saveAgentOutput(agent, agentDir, result.output);
+        writeOutputToArtifactIfNeeded(agent, agentDir, result.output);
         const artifactContent = readPrimaryArtifact(agent, agentDir);
         if (artifactContent) {
           artifactContexts.push(
@@ -99,11 +100,17 @@ export async function startCommand(options: StartOptions): Promise<void> {
         session.status = 'failed';
         session.error = result.error;
         console.log(`  Failed: ${result.error}`);
+        session.completedAt = new Date().toISOString();
+        updateSession(runId, session);
+        break;
       }
     } catch (err: any) {
       session.status = 'failed';
       session.error = err.message;
       console.log(`  Error: ${err.message}`);
+      session.completedAt = new Date().toISOString();
+      updateSession(runId, session);
+      break;
     }
 
     session.completedAt = new Date().toISOString();
@@ -159,7 +166,7 @@ function createTaskWorktree(runId: string): string | null {
   const worktreePath = path.join(worktreesDir, `agent-${runId}`);
 
   if (fs.existsSync(worktreePath)) {
-    console.log(`  Reusing task worktree: ${worktreePath}`);
+    console.log(`  Reusing task worktree: ${worktreePath}\n`);
     return worktreePath;
   }
 
@@ -209,6 +216,15 @@ function buildContext(artifactContexts: string[]): string {
   return artifactContexts.join('\n\n---\n\n');
 }
 
+function isArtifactStillTemplate(filePath: string): boolean {
+  if (!fs.existsSync(filePath)) return true;
+
+  const content = fs.readFileSync(filePath, 'utf-8');
+  if (content.trim().length === 0) return true;
+
+  return content.includes('<!--');
+}
+
 function readPrimaryArtifact(
   agent: AgentConfig,
   agentDir: string
@@ -225,13 +241,19 @@ function readPrimaryArtifact(
   return content;
 }
 
-function saveAgentOutput(
+function writeOutputToArtifactIfNeeded(
   agent: AgentConfig,
   agentDir: string,
-  output: string
+  stdout: string
 ): void {
   const artifactName = ROLE_ARTIFACT_MAP[agent.role];
   if (!artifactName) return;
+
+  const filePath = path.join(agentDir, artifactName);
+
+  if (!isArtifactStillTemplate(filePath)) {
+    return;
+  }
 
   const title = artifactName
     .replace('.md', '')
@@ -244,7 +266,7 @@ function saveAgentOutput(
 
 ## Output
 
-${output}
+${stdout}
 `;
   updateArtifact(agentDir, artifactName as any, content);
 }

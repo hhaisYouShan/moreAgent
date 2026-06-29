@@ -2,22 +2,21 @@
 
 ## Overview
 
-MoreAgent is a project-level multi-agent / multi-session orchestration tool that integrates with OpenCode CLI. It coordinates multiple AI agents, each with an independent session, prompt, and artifact output directory. Agents that modify code use isolated git worktrees.
+MoreAgent is a project-level multi-agent / multi-session orchestration tool that integrates with OpenCode CLI. It coordinates multiple AI agents, each with an independent session, prompt, and artifact output directory. Code-modifying agents share one isolated git worktree per run.
 
 ## Core Concepts
 
 ### Agent
 An AI agent with a specific role (architect, implementer, tester, reviewer). Each agent has:
-- **Independent session**: separate OpenCode process
+- **Independent session**: separate OpenCode process, called via `opencode run --agent <name>`
 - **Independent prompt**: role-specific system prompt
 - **Independent artifact directory**: per-run, per-agent output
-- **Independent git worktree**: for code-modifying agents
 
 ### Run
-A single execution of the orchestration triggered by `moreagent start --once --task "..."`. A run creates:
+A single execution triggered by `moreagent start --once --task "..."`. A run creates:
 - A run directory: `.moreagent/runs/<run-id>/`
 - Per-agent artifact directories: `.moreagent/runs/<run-id>/<agent-name>/`
-- Worktrees: `.moreagent/worktrees/<agent-name>-<run-id>/`
+- One task worktree: `.moreagent/worktrees/agent-<run-id>/` on branch `agent/<run-id>` (only if any agent has `canModifyCode: true`)
 
 ### Session
 Represents a single agent's execution within a run. Tracked in `sessions.json`.
@@ -26,61 +25,77 @@ Represents a single agent's execution within a run. Tracked in `sessions.json`.
 
 ```
 project/
-├── .moreagent/               # MoreAgent project state
-│   ├── config.yaml           # Project configuration
-│   ├── sessions.json         # Session tracking
-│   ├── runs/                 # Run outputs
+├── .moreagent/
+│   ├── config.yaml
+│   ├── sessions.json
+│   ├── runs/
 │   │   └── <run-id>/
-│   │       ├── run.json      # Run metadata
-│   │       └── <agent-name>/
-│   │           ├── task.md
-│   │           ├── brain-plan.md
-│   │           ├── implementation-result.md
-│   │           ├── test-report.md
-│   │           └── review-report.md
-│   └── worktrees/            # Git worktrees for code-modifying agents
+│   │       ├── architect/
+│   │       │   ├── task.md
+│   │       │   ├── brain-plan.md
+│   │       │   ├── stdout.log
+│   │       │   └── stderr.log (if errors)
+│   │       ├── implementer/
+│   │       ├── tester/
+│   │       └── reviewer/
+│   └── worktrees/
+│       └── agent-<run-id>/        # One per run, shared by code-modifying agents
 ```
 
 ## Component Diagram
 
 ```
 CLI (cli.ts)
-├── init command    →  Creates .moreagent/ structure
-└── start command   →  Orchestrates agent execution
-    ├── ConfigReader (config.ts)      →  Reads config.yaml
-    ├── SessionManager (session.ts)   →  Manages sessions.json
-    ├── RunManager                    →  Creates run directories
-    ├── WorktreeManager               →  Creates git worktrees
-    ├── OpenCodeRuntimeAdapter        →  Calls OpenCode CLI per agent
-    └── ArtifactWriter (artifacts.ts) →  Writes output artifacts
+├── init command
+└── start command
+    ├── ConfigReader (config.ts)
+    ├── SessionManager (session.ts)
+    ├── WorktreeManager              →  Creates ONE worktree per run
+    ├── OpenCodeRuntimeAdapter       →  spawns opencode run --agent <name>
+    └── ArtifactWriter (artifacts.ts)
 ```
 
 ## Execution Flow
 
 1. `moreagent start --once --task "build login page"`
 2. Read `config.yaml` for agent definitions
-3. Create run directory with unique ID
-4. For each agent (sequentially in MVP):
-   a. Create agent artifact directory
-   b. Write `task.md` with the agent-specific task
-   c. If `canModifyCode`: create git worktree
-   d. Execute OpenCode with agent prompt + task
-   e. Parse output into artifacts
-   f. Update session status
-5. Output summary
+3. If any agent has `canModifyCode: true`, create task worktree on branch `agent/<runId>`
+4. Create run directory with unique ID
+5. Run agents sequentially:
+   a. Create agent artifact directory, write template artifacts
+   b. Write `task.md` with agent-specific task + context from previous agents
+   c. Execute `opencode run --agent <name> <prompt>` in the appropriate working dir
+   d. Agent writes output to artifact files; stdout/logs saved as fallback
+   e. On failure: stop pipeline immediately
+   f. On success: read primary artifact for next agent's context
+6. Output summary
+
+## Worktree Strategy
+
+- **One worktree per run**: `.moreagent/worktrees/agent-<runId>/`, branch `agent/<runId>`
+- Only created when at least one agent in the pipeline has `canModifyCode: true`
+- **implementer** and **tester** share the same worktree, executing serially
+- **architect** and **reviewer** run in the original project directory (read-only)
 
 ## Agent Pipeline (MVP)
 
 ```
 architect → implementer → tester → reviewer
    │            │           │          │
-   │            │           │          └── review-report.md
-   │            │           └── test-report.md
-   │            └── implementation-result.md
-   └── brain-plan.md
+   │            │           │          └── review-report.md (in original repo)
+   │            │           └── test-report.md     (in task worktree)
+   │            └── implementation-result.md        (in task worktree)
+   └── brain-plan.md                                (in original repo)
 ```
 
-Each agent receives the task + previous agent's output as context.
+Each agent receives the task + all previous agents' primary artifact content as context. If an agent fails, the pipeline stops immediately.
+
+## Artifact Handling
+
+- Templates are written before agent execution
+- Agent writes actual content to artifact files during execution
+- After completion: if primary artifact still contains `<!--` (template markers), stdout is used as fallback
+- stdout and stderr are always saved to `stdout.log` and `stderr.log`
 
 ## Design Principles
 
@@ -88,3 +103,4 @@ Each agent receives the task + previous agent's output as context.
 - **File-based state**: JSON files, not databases
 - **CLI-first**: No web UI in MVP
 - **No auto merge/push**: All changes stay in worktrees until manual review
+- **Fail fast**: Any agent failure stops the entire pipeline

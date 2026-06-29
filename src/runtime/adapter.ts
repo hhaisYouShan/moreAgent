@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import { spawn } from 'child_process';
 import { AgentResult } from '../types';
 
@@ -27,7 +29,7 @@ export class OpenCodeRuntimeAdapter {
       options.artifactDir,
       options.context
     );
-    const args = this.buildArgs(fullPrompt, options.agentName, options.sessionId);
+    const args = this.buildArgs(fullPrompt, options.agentName);
 
     return new Promise<AgentResult>((resolve) => {
       let stdout = '';
@@ -57,6 +59,7 @@ export class OpenCodeRuntimeAdapter {
 
       proc.on('close', (code) => {
         clearTimeout(timer);
+        this.writeLogs(options.artifactDir, stdout, stderr);
         resolve({
           success: code === 0,
           output: stdout,
@@ -67,6 +70,7 @@ export class OpenCodeRuntimeAdapter {
 
       proc.on('error', (err) => {
         clearTimeout(timer);
+        this.writeLogs(options.artifactDir, stdout, stderr);
         resolve({
           success: false,
           output: stdout,
@@ -101,11 +105,21 @@ export class OpenCodeRuntimeAdapter {
     return full;
   }
 
-  private buildArgs(
-    prompt: string,
-    agentName: string,
-    sessionId: string
-  ): string[] {
-    return ['run', '--agent', agentName, '--session', sessionId, prompt];
+  private buildArgs(prompt: string, agentName: string): string[] {
+    return ['run', '--agent', agentName, prompt];
+  }
+
+  private writeLogs(
+    artifactDir: string,
+    stdout: string,
+    stderr: string
+  ): void {
+    if (!fs.existsSync(artifactDir)) {
+      fs.mkdirSync(artifactDir, { recursive: true });
+    }
+    fs.writeFileSync(path.join(artifactDir, 'stdout.log'), stdout, 'utf-8');
+    if (stderr) {
+      fs.writeFileSync(path.join(artifactDir, 'stderr.log'), stderr, 'utf-8');
+    }
   }
 }
