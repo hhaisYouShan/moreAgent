@@ -72,6 +72,9 @@ function printLatestRun(run: Run): void {
     if (session.worktreePath) {
       console.log(`    Worktree: ${session.worktreePath}`);
     }
+    if (session.runtimeSessionId) {
+      console.log(`    Runtime Session: ${session.runtimeSessionId}`);
+    }
     if (session.error) {
       console.log(`    Error: ${session.error}`);
     }

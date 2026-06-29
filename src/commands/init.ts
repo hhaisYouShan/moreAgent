@@ -6,6 +6,7 @@ import {
   getOpenCodeAgentsDir,
 } from '../config';
 import { initTasksFile } from '../queue';
+import { initRuntimeSessionRegistry } from '../runtimeSessions';
 
 const DEFAULT_CONFIG = `# MoreAgent Configuration
 version: "1.0"
@@ -100,6 +101,7 @@ export function initCommand(): void {
     console.log(`.moreagent/ already exists at ${dir}`);
     ensureOpenCodeAgents();
     initTasksFile();
+    initRuntimeSessionRegistry();
     if (configExists()) {
       console.log('Config already exists. Run "moreagent start" to begin.');
       return;
@@ -128,6 +130,7 @@ export function initCommand(): void {
   }
 
   initTasksFile();
+  initRuntimeSessionRegistry();
 
   console.log(`\nInitialized at ${dir}`);
   console.log('Created:');

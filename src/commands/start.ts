@@ -15,6 +15,10 @@ import {
   addAgentWindow,
   type TmuxContext,
 } from '../tmux';
+import {
+  getAgentRuntimeSessionId,
+  setAgentRuntimeSessionId,
+} from '../runtimeSessions';
 import { Run, Session, AgentConfig } from '../types';
 
 export interface StartOptions {
@@ -424,6 +428,27 @@ async function executeAgentSession(
   }
 
   try {
+    if (!session.runtimeSessionId) {
+      if (sessionName.startsWith('repair-')) {
+        const baseRole = sessionName.replace(/^repair-\d+-/, '');
+        const baseSession = ctx.run.sessions.find(
+          (s) => s.agentName === baseRole && s.runtimeSessionId
+        );
+        if (baseSession?.runtimeSessionId) {
+          session.runtimeSessionId = baseSession.runtimeSessionId;
+        }
+      }
+      if (!session.runtimeSessionId) {
+        const stored = getAgentRuntimeSessionId(agent.name);
+        if (stored) {
+          session.runtimeSessionId = stored;
+        }
+      }
+      if (session.runtimeSessionId) {
+        updateSession(ctx.run.id, session);
+      }
+    }
+
     const result = await ctx.adapter.execute({
       opencodePath: ctx.config.runtime.opencodePath,
       agentName: agent.name,
@@ -451,20 +476,17 @@ async function executeAgentSession(
     session.status = 'completed';
     session.completedAt = new Date().toISOString();
 
-    if (!session.runtimeSessionId && sessionName.startsWith('repair-')) {
-      const baseRole = sessionName.replace(/^repair-\d+-/, '');
-      const baseSession = ctx.run.sessions.find(
-        (s) => s.agentName === baseRole && s.runtimeSessionId
-      );
-      if (baseSession?.runtimeSessionId) {
-        session.runtimeSessionId = baseSession.runtimeSessionId;
-      }
-    }
-
     if (!session.runtimeSessionId) {
-      const captured = ctx.adapter.captureRuntimeSessionId(session.id);
+      const captured = ctx.adapter.captureRuntimeSessionId(
+        ctx.config.runtime.opencodePath,
+        session.id
+      );
       if (captured) {
         session.runtimeSessionId = captured;
+        if (!sessionName.startsWith('repair-')) {
+          setAgentRuntimeSessionId(agent.name, captured);
+        }
+        updateSession(ctx.run.id, session);
       }
     }
 

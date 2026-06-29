@@ -200,12 +200,15 @@ export class OpenCodeRuntimeAdapter {
     }
   }
 
-  public captureRuntimeSessionId(moreagentSessionId: string): string | null {
+  public captureRuntimeSessionId(
+    opencodePath: string,
+    moreagentSessionId: string
+  ): string | null {
     try {
       const result = spawnSync(
-        'opencode',
+        opencodePath,
         ['session', 'list', '--print-logs'],
-        { stdio: 'pipe', encoding: 'utf-8' }
+        { stdio: 'pipe', encoding: 'utf-8', timeout: 5000 }
       );
       const title = `moreagent-${moreagentSessionId}`;
       for (const line of result.stdout.split('\n')) {
