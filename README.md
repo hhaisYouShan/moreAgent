@@ -188,13 +188,15 @@ opencode run --agent architect "只输出 OK"
 
 ### Git worktree creation fails
 
-The pipeline includes code-modifying agents (implementer, tester) that require a git worktree. If worktree creation fails, the run is aborted — the main working directory is never used as a fallback.
+The pipeline includes code-modifying agents (implementer, tester) that require a git worktree. The reviewer also runs inside the task worktree to inspect the final diff. If worktree creation fails, the run is aborted — the main working directory is never used as a fallback.
+
+**MoreAgent never creates commits automatically.** The project must be a git repo with at least one commit before running the full pipeline.
 
 ```bash
 # Check if this is a git repo
 git rev-parse --git-dir
 
-# If not, initialize one
+# If not, initialize one and create the first commit manually
 git init
 git add .
 git commit -m "Initial commit"

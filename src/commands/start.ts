@@ -217,20 +217,12 @@ function ensureRepoHasCommits(): void {
       stdio: 'pipe',
     });
   } catch {
-    console.log('  No commits found. Creating initial commit for worktree support...');
-    try {
-      const { execSync } = require('child_process');
-      execSync('git add -A', { cwd: process.cwd(), stdio: 'pipe' });
-      execSync('git commit -m "Initial commit (moreagent worktree baseline)"', {
-        cwd: process.cwd(),
-        stdio: 'pipe',
-      });
-      console.log('  Initial commit created.\n');
-    } catch (err: any) {
-      throw new Error(
-        `Cannot create git worktree: no commits in repository and failed to create initial commit (${err.message}). Run "git add . && git commit -m Initial" first.`
-      );
-    }
+    throw new Error(
+      'Cannot create git worktree: the repository has no commits.\n' +
+        'Run these commands first:\n' +
+        '  git add .\n' +
+        '  git commit -m "Initial commit"'
+    );
   }
 }
 
@@ -250,7 +242,7 @@ function resolveWorkingDir(
   agent: AgentConfig,
   taskWorktree: string | null
 ): string {
-  if (agent.canModifyCode && taskWorktree) {
+  if (taskWorktree && (agent.canModifyCode || agent.role === 'reviewer')) {
     return taskWorktree;
   }
   return process.cwd();
