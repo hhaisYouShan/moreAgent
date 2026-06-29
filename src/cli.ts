@@ -5,6 +5,12 @@ import { diffCommand } from './commands/diff';
 import { initCommand } from './commands/init';
 import { inspectCommand } from './commands/inspect';
 import { queueAddCommand, queueListCommand, queueRecoverCommand, queueRetryCommand } from './commands/queue';
+import {
+  sessionsListCommand,
+  sessionsResetCommand,
+  sessionsResetAllCommand,
+  sessionsExportCommand,
+} from './commands/sessions';
 import { statusCommand } from './commands/status';
 import { startCommand } from './commands/start';
 
@@ -29,6 +35,10 @@ Commands:
   inspect --agent <name>    Show an agent's primary artifact
   inspect --run <id>        Show a specific run
   clean                     Clean runs or worktrees
+  sessions list             List agent runtime session mappings
+  sessions reset --agent <n> Reset one agent's runtime session
+  sessions reset --all      Reset all runtime sessions
+  sessions export           Export runtime session registry
 
 Start Options:
   --once                    Run a single task (requires --task)
@@ -153,6 +163,30 @@ async function main(): Promise<void> {
         const inspectAgent =
           inspectAgentIdx !== -1 ? args[inspectAgentIdx + 1] : undefined;
         inspectCommand({ run: inspectRunId, agent: inspectAgent });
+        break;
+      }
+
+      case 'sessions': {
+        const sub = args[1];
+        if (sub === 'list') {
+          sessionsListCommand();
+        } else if (sub === 'reset') {
+          if (args.includes('--all')) {
+            sessionsResetAllCommand();
+          } else {
+            const agentIdx = args.indexOf('--agent');
+            if (agentIdx === -1 || !args[agentIdx + 1]) {
+              console.error('Usage: moreagent sessions reset --agent <name> or --all');
+              process.exit(1);
+            }
+            sessionsResetCommand(args[agentIdx + 1]);
+          }
+        } else if (sub === 'export') {
+          sessionsExportCommand(args.includes('--json'));
+        } else {
+          console.error('Usage: moreagent sessions <list|reset|export>');
+          process.exit(1);
+        }
         break;
       }
 

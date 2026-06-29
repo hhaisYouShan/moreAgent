@@ -53,3 +53,27 @@ export function initRuntimeSessionRegistry(): void {
     writeRegistry({ provider: 'opencode', agents: {} });
   }
 }
+
+export function resetAgentRuntimeSession(agentName: string): boolean {
+  const reg = readRegistry();
+  if (reg.agents[agentName]) {
+    delete reg.agents[agentName];
+    writeRegistry(reg);
+    return true;
+  }
+  return false;
+}
+
+export function resetAllRuntimeSessions(): void {
+  const reg = readRegistry();
+  reg.agents = {};
+  writeRegistry(reg);
+}
+
+export function readFullRegistry(): RuntimeSessionRegistry {
+  return readRegistry();
+}
+
+export function isInit(): boolean {
+  return fs.existsSync(getRegistryPath());
+}
