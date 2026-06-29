@@ -369,13 +369,6 @@ async function executePhases(ctx: {
   startFrom: number;
 }): Promise<boolean> {
   const { run, agentByRole, adapter, tmux, startFrom } = ctx;
-  const brain = agentByRole.get('brain')!;
-  const product = agentByRole.get('product')!;
-  const frontend = agentByRole.get('frontend')!;
-  const backend = agentByRole.get('backend')!;
-  const tester = agentByRole.get('tester')!;
-  const reviewer = agentByRole.get('reviewer')!;
-  const MAX_GATE_ROUNDS = 2;
 
   const runner = async (
     agent: AgentConfig,
@@ -415,14 +408,22 @@ async function executePhases(ctx: {
 
     console.log(`\n=== Phase: ${phase.id} (${phase.description}) ===`);
 
-    for (const sess of phase.sessions) {
-      const agent = agentByRole.get(sess.agentKey);
-      if (!agent) throw new Error(`Agent not found: ${sess.agentKey}`);
-      const res = await runner(agent, sess.name, sess.artifact);
-      if (!res.success) {
-        wf.failedPhase = phase.id;
-        updateRun(run);
-        return false;
+    if (phase.id === 'prd-gate') {
+      const gateOk = await runPrdGate(ctx, runner, readArtifact);
+      if (!gateOk) { wf.failedPhase = phase.id; updateRun(run); return false; }
+    } else if (phase.id === 'tech-gate') {
+      const gateOk = await runTechGate(ctx, runner, readArtifact);
+      if (!gateOk) { wf.failedPhase = phase.id; updateRun(run); return false; }
+    } else {
+      for (const sess of phase.sessions) {
+        const agent = agentByRole.get(sess.agentKey);
+        if (!agent) throw new Error(`Agent not found: ${sess.agentKey}`);
+        const res = await runner(agent, sess.name, sess.artifact);
+        if (!res.success) {
+          wf.failedPhase = phase.id;
+          updateRun(run);
+          return false;
+        }
       }
     }
 
@@ -431,6 +432,93 @@ async function executePhases(ctx: {
   }
 
   return true;
+}
+
+async function runPrdGate(
+  ctx: Parameters<typeof executePhases>[0],
+  runner: (agent: AgentConfig, name: string, artifact: string, ctx?: string | null) => Promise<{ success: boolean; agentDir: string }>,
+  readArtifact: (dir: string, file: string) => string | null,
+): Promise<boolean> {
+  const brain = ctx.agentByRole.get('brain')!;
+  const product = ctx.agentByRole.get('product')!;
+  const maxRounds = 2;
+
+  const productDir = ctx.run.sessions.find((s) => s.agentName === 'product')?.artifactDir ?? '';
+  const prdCtx = readArtifact(productDir, 'prd.md');
+
+  const runGateDecision = async (sessionName: string, artifact: string) => {
+    const res = await runner(brain, sessionName, artifact);
+
+    if (!res.success) return { passed: false, agentDir: res.agentDir };
+    const decision = evaluateGateArtifactFile(res.agentDir, artifact);
+    return { passed: decision.passed, agentDir: res.agentDir };
+  };
+
+  // Round 1
+  const gate1 = await runGateDecision('prd-gate', 'prd-decision.md');
+  if (gate1.passed) return true;
+
+  for (let round = 1; round <= maxRounds; round++) {
+    console.log(`  PRD gate: revision round ${round}/${maxRounds}`);
+    const revArtifact = `prd-revision-${round}.md`;
+    const decArtifact = `prd-decision-${round}.md`;
+
+    const revRes = await runner(product, `prd-revision-${round}`, revArtifact, prdCtx);
+    if (!revRes.success) return false;
+
+    const gateRes = await runGateDecision(`prd-gate-${round}`, decArtifact);
+    if (gateRes.passed) return true;
+  }
+
+  console.log('  PRD gate failed after maximum revision rounds.');
+  return false;
+}
+
+async function runTechGate(
+  ctx: Parameters<typeof executePhases>[0],
+  runner: (agent: AgentConfig, name: string, artifact: string, ctx?: string | null) => Promise<{ success: boolean; agentDir: string }>,
+  readArtifact: (dir: string, file: string) => string | null,
+): Promise<boolean> {
+  const brain = ctx.agentByRole.get('brain')!;
+  const frontend = ctx.agentByRole.get('frontend')!;
+  const backend = ctx.agentByRole.get('backend')!;
+  const tester = ctx.agentByRole.get('tester')!;
+  const maxRounds = 2;
+
+  const buildCtx = () => {
+    const fePlan = ctx.run.sessions.find((s) => s.agentName === 'frontend-plan')?.artifactDir ?? '';
+    const bePlan = ctx.run.sessions.find((s) => s.agentName === 'backend-plan')?.artifactDir ?? '';
+    const tPlan = ctx.run.sessions.find((s) => s.agentName === 'test-plan')?.artifactDir ?? '';
+    return [readArtifact(fePlan, 'frontend-plan.md'), readArtifact(bePlan, 'backend-plan.md'), readArtifact(tPlan, 'test-plan.md')]
+      .filter(Boolean).join('\n\n---\n\n');
+  };
+
+  const runGateDecision = async (sessionName: string, artifact: string) => {
+    const res = await runner(brain, sessionName, artifact, buildCtx());
+    if (!res.success) return { passed: false, agentDir: res.agentDir };
+    const decision = evaluateGateArtifactFile(res.agentDir, artifact);
+    return { passed: decision.passed, agentDir: res.agentDir };
+  };
+
+  // Round 1
+  const gate1 = await runGateDecision('tech-gate', 'tech-review.md');
+  if (gate1.passed) return true;
+
+  for (let round = 1; round <= maxRounds; round++) {
+    console.log(`  Tech gate: revision round ${round}/${maxRounds}`);
+    const revisionCtx = buildCtx();
+
+    const feRes = await runner(frontend, `frontend-plan-revision-${round}`, `frontend-plan-revision-${round}.md`, revisionCtx);
+    const beRes = await runner(backend, `backend-plan-revision-${round}`, `backend-plan-revision-${round}.md`, revisionCtx);
+    const tRes = await runner(tester, `test-plan-revision-${round}`, `test-plan-revision-${round}.md`, revisionCtx);
+    if (!feRes.success || !beRes.success || !tRes.success) return false;
+
+    const gateRes = await runGateDecision(`tech-gate-${round}`, `tech-review-${round}.md`);
+    if (gateRes.passed) return true;
+  }
+
+  console.log('  Tech gate failed after maximum revision rounds.');
+  return false;
 }
 
 async function runSequentialPipeline(ctx: PipelineContext): Promise<boolean> {

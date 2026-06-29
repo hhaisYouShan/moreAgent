@@ -223,6 +223,46 @@ Decision: CHANGES_REQUESTED
 ## Key Decisions
 <!-- Important choices made -->
 `,
+  'prd-revision-1.md': `# PRD Revision (Round 1)
+<!-- Updated PRD addressing review feedback -->
+`,
+  'prd-decision-1.md': `Decision: APPROVED
+# PRD Gate Decision (Round 1)
+<!-- Gate review of revised PRD -->
+`,
+  'prd-revision-2.md': `# PRD Revision (Round 2)
+<!-- Final revised PRD -->
+`,
+  'prd-decision-2.md': `Decision: APPROVED
+# PRD Gate Decision (Round 2)
+<!-- Final gate review -->
+`,
+  'frontend-plan-revision-1.md': `# Frontend Plan Revision (Round 1)
+<!-- Revised frontend plan -->
+`,
+  'backend-plan-revision-1.md': `# Backend Plan Revision (Round 1)
+<!-- Revised backend plan -->
+`,
+  'test-plan-revision-1.md': `# Test Plan Revision (Round 1)
+<!-- Revised test plan -->
+`,
+  'tech-review-1.md': `Decision: APPROVED
+# Tech Gate Review (Round 1)
+<!-- Gate review of revised plans -->
+`,
+  'frontend-plan-revision-2.md': `# Frontend Plan Revision (Round 2)
+<!-- Final revised frontend plan -->
+`,
+  'backend-plan-revision-2.md': `# Backend Plan Revision (Round 2)
+<!-- Final revised backend plan -->
+`,
+  'test-plan-revision-2.md': `# Test Plan Revision (Round 2)
+<!-- Final revised test plan -->
+`,
+  'tech-review-2.md': `Decision: APPROVED
+# Tech Gate Review (Round 2)
+<!-- Final gate review -->
+`,
 
 };
 
