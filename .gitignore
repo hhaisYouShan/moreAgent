@@ -1,6 +1,6 @@
 node_modules/
 dist/
-
+.moreagent/
 *.js.map
 *.d.ts
 *.d.ts.map
