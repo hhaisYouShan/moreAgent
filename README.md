@@ -57,6 +57,7 @@ moreagent start --once --task "add a dark mode toggle to settings"
 If `tester` fails, MoreAgent will retry from `implementer` and then rerun `tester`.
 If `reviewer` fails, MoreAgent will retry from `implementer` and then rerun `tester` and `reviewer`.
 The MVP retries at most 2 repair rounds in the same task worktree. It does not auto-merge or auto-push.
+Repair session names such as `repair-1-implementer` are only used by MoreAgent for sessions and artifact directories; OpenCode still reuses the original agents like `implementer`, `tester`, and `reviewer`.
 
 Example output:
 

@@ -321,7 +321,7 @@ async function executeAgentSession(
   try {
     const result = await ctx.adapter.execute({
       opencodePath: ctx.config.runtime.opencodePath,
-      agentName: sessionName,
+      agentName: agent.name,
       sessionId: session.id,
       prompt: agent.prompt,
       task: ctx.options.task,
