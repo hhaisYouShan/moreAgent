@@ -532,13 +532,19 @@ async function runProductRepairGate(
   runner: GateRunner,
   product: AgentConfig,
   brain: AgentConfig,
+  readArtifact: (dir: string, file: string) => string | null,
   round: number,
 ): Promise<boolean> {
   const maxGateRounds = 2;
+
   const runDecision = async (name: string, artifact: string) => {
     const res = await runner(brain, name, artifact);
-    if (!res.success) return false;
-    return true;
+    if (!res.success) return null;
+    const content = readArtifact(res.agentDir, artifact);
+    if (!content) return 'unknown' as const;
+    if (/^Decision:\s*CHANGES_REQUESTED\s*$/im.test(content)) return 'changes_requested' as const;
+    if (/^Decision:\s*APPROVED\s*$/im.test(content)) return 'approved' as const;
+    return 'unknown' as const;
   };
 
   // Initial PRD revision
@@ -546,17 +552,15 @@ async function runProductRepairGate(
   if (!prdRes.success) return false;
 
   // PRD gate
-  await runDecision(`prd-decision-repair-${round}`, `prd-decision-repair-${round}.md`);
+  const firstDecision = await runDecision(`prd-decision-repair-${round}`, `prd-decision-repair-${round}.md`);
+  if (firstDecision === 'approved') return true;
+  if (firstDecision === null) return false;
 
   for (let gr = 1; gr <= maxGateRounds; gr++) {
-    const gateFile = `prd-decision-repair-${round}-${gr}`;
-    const gateContent = readArtifactFromDir('', gateFile + '.md');
-    if (gateContent && /^Decision:\s*CHANGES_REQUESTED\s*$/im.test(gateContent)) {
-      await runner(product, `${gateFile}-product`, `prd-revision-repair-${round}-${gr}.md`);
-      await runDecision(`${gateFile}-brain`, `${gateFile}.md`);
-    } else {
-      return true;
-    }
+    await runner(product, `prd-revision-repair-${round}-${gr}`, `prd-revision-repair-${round}-${gr}.md`);
+    const decision = await runDecision(`prd-decision-repair-${round}-${gr}`, `prd-decision-repair-${round}-${gr}.md`);
+    if (decision === 'approved') return true;
+    if (decision === null) return false;
   }
   return false;
 }
@@ -567,9 +571,20 @@ async function runTechPlanRepairGate(
   backend: AgentConfig,
   tester: AgentConfig,
   brain: AgentConfig,
+  readArtifact: (dir: string, file: string) => string | null,
   round: number,
 ): Promise<boolean> {
   const maxGateRounds = 2;
+
+  const runDecision = async (name: string, artifact: string) => {
+    const res = await runner(brain, name, artifact);
+    if (!res.success) return null;
+    const content = readArtifact(res.agentDir, artifact);
+    if (!content) return 'unknown' as const;
+    if (/^Decision:\s*CHANGES_REQUESTED\s*$/im.test(content)) return 'changes_requested' as const;
+    if (/^Decision:\s*APPROVED\s*$/im.test(content)) return 'approved' as const;
+    return 'unknown' as const;
+  };
 
   // Initial plan revisions
   await runner(frontend, `frontend-plan-revision-repair-${round}`, `frontend-plan-revision-repair-${round}.md`);
@@ -577,20 +592,17 @@ async function runTechPlanRepairGate(
   await runner(tester, `test-plan-revision-repair-${round}`, `test-plan-revision-repair-${round}.md`);
 
   // Tech gate
-  const gateRes = await runner(brain, `tech-review-repair-${round}`, `tech-review-repair-${round}.md`);
-  if (!gateRes.success) return false;
+  const firstDecision = await runDecision(`tech-review-repair-${round}`, `tech-review-repair-${round}.md`);
+  if (firstDecision === 'approved') return true;
+  if (firstDecision === null) return false;
 
   for (let gr = 1; gr <= maxGateRounds; gr++) {
-    const gateFile = `tech-review-repair-${round}-${gr}`;
-    const gateContent = readArtifactFromDir('', gateFile + '.md');
-    if (gateContent && /^Decision:\s*CHANGES_REQUESTED\s*$/im.test(gateContent)) {
-      await runner(frontend, `frontend-plan-revision-repair-${round}-${gr}`, `frontend-plan-revision-repair-${round}-${gr}.md`);
-      await runner(backend, `backend-plan-revision-repair-${round}-${gr}`, `backend-plan-revision-repair-${round}-${gr}.md`);
-      await runner(tester, `test-plan-revision-repair-${round}-${gr}`, `test-plan-revision-repair-${round}-${gr}.md`);
-      await runner(brain, `${gateFile}-brain`, `${gateFile}.md`);
-    } else {
-      return true;
-    }
+    await runner(frontend, `frontend-plan-revision-repair-${round}-${gr}`, `frontend-plan-revision-repair-${round}-${gr}.md`);
+    await runner(backend, `backend-plan-revision-repair-${round}-${gr}`, `backend-plan-revision-repair-${round}-${gr}.md`);
+    await runner(tester, `test-plan-revision-repair-${round}-${gr}`, `test-plan-revision-repair-${round}-${gr}.md`);
+    const decision = await runDecision(`tech-review-repair-${round}-${gr}`, `tech-review-repair-${round}-${gr}.md`);
+    if (decision === 'approved') return true;
+    if (decision === null) return false;
   }
   return false;
 }
@@ -646,14 +658,14 @@ async function runTestWithRepair(
         await runner(tester, `test-repair-${round}`, `test-repair-${round}.md`);
       } else if (owner === 'tech-plan') {
         const brain = ctx.agentByRole.get('brain')!;
-        const gateOk = await runTechPlanRepairGate(runner, frontend, backend, tester, brain, round);
+        const gateOk = await runTechPlanRepairGate(runner, frontend, backend, tester, brain, readArtifact, round);
         if (!gateOk) return false;
         await runner(frontend, `frontend-implementation-repair-${round}`, `frontend-implementation-repair-${round}.md`);
         await runner(backend, `backend-implementation-repair-${round}`, `backend-implementation-repair-${round}.md`);
       } else if (owner === 'product') {
         const product = ctx.agentByRole.get('product')!;
         const brain = ctx.agentByRole.get('brain')!;
-        const gateOk = await runProductRepairGate(runner, product, brain, round);
+        const gateOk = await runProductRepairGate(runner, product, brain, readArtifact, round);
         if (!gateOk) return false;
         await runner(frontend, `frontend-plan-repair-${round}`, `frontend-plan-repair-${round}.md`);
         await runner(backend, `backend-plan-repair-${round}`, `backend-plan-repair-${round}.md`);
@@ -722,14 +734,14 @@ async function runReviewWithRepair(
       await runner(tester, `test-repair-${round}`, `test-repair-${round}.md`);
     } else if (owner === 'tech-plan') {
       const brain = ctx.agentByRole.get('brain')!;
-      const gateOk = await runTechPlanRepairGate(runner, frontend, backend, tester, brain, round);
+      const gateOk = await runTechPlanRepairGate(runner, frontend, backend, tester, brain, readArtifact, round);
       if (!gateOk) return false;
       await runner(frontend, `frontend-implementation-repair-${round}`, `frontend-implementation-repair-${round}.md`);
       await runner(backend, `backend-implementation-repair-${round}`, `backend-implementation-repair-${round}.md`);
     } else if (owner === 'product') {
       const product = ctx.agentByRole.get('product')!;
       const brain = ctx.agentByRole.get('brain')!;
-      const gateOk = await runProductRepairGate(runner, product, brain, round);
+      const gateOk = await runProductRepairGate(runner, product, brain, readArtifact, round);
       if (!gateOk) return false;
       await runner(frontend, `frontend-plan-repair-${round}`, `frontend-plan-repair-${round}.md`);
       await runner(backend, `backend-plan-repair-${round}`, `backend-plan-repair-${round}.md`);

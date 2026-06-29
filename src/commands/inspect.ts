@@ -55,7 +55,7 @@ function printRunOverview(run: Run): void {
   console.log('');
   console.log('Sessions:');
   for (const session of run.sessions) {
-    const primaryName = PRIMARY_ARTIFACT_MAP[session.agentName.replace(/^repair-\d+-/, '')];
+    const primaryName = resolvePrimaryArtifact(session.agentName);
     const primaryPath = primaryName
       ? path.join(session.artifactDir, primaryName)
       : session.artifactDir;
@@ -86,11 +86,11 @@ function printAgentArtifact(run: Run, agentName: string): void {
     return;
   }
 
-  const roleName = session.agentName.replace(/^repair-\d+-/, '');
-  const primaryName = PRIMARY_ARTIFACT_MAP[roleName];
+  console.log(`Matched latest session: ${session.agentName}`);
+  const primaryName = resolvePrimaryArtifact(session.agentName);
 
   if (!primaryName) {
-    console.log(`No primary artifact defined for role "${roleName}".`);
+    console.log(`No primary artifact defined for session "${session.agentName}".`);
     console.log(`Session artifacts: ${session.artifactDir}`);
     return;
   }
@@ -138,7 +138,44 @@ const PRIMARY_ARTIFACT_MAP: Record<string, string> = {
   implementer: 'implementation-result.md',
   tester: 'test-report.md',
   reviewer: 'review-report.md',
+  brain: 'brain-plan.md',
+  product: 'prd.md',
+  frontend: 'frontend-plan.md',
+  backend: 'backend-plan.md',
 };
+
+function resolveArtifactForSessionName(sessionName: string): string | null {
+  const map: Record<string, string> = {
+    'brain': 'brain-plan.md',
+    'product': 'prd.md',
+    'frontend-prd-review': 'frontend-prd-review.md',
+    'backend-prd-review': 'backend-prd-review.md',
+    'test-prd-review': 'test-prd-review.md',
+    'prd-gate': 'prd-decision.md',
+    'frontend-plan': 'frontend-plan.md',
+    'backend-plan': 'backend-plan.md',
+    'test-plan': 'test-plan.md',
+    'tech-gate': 'tech-review.md',
+    'frontend-implementation': 'frontend-implementation.md',
+    'backend-implementation': 'backend-implementation.md',
+    'tester': 'test-report.md',
+    'reviewer': 'review-report.md',
+  };
+
+  for (const [key, artifact] of Object.entries(map)) {
+    if (sessionName.startsWith(key)) return artifact;
+  }
+
+  const base = sessionName.replace(/^repair-\d+-/, '');
+  return PRIMARY_ARTIFACT_MAP[base] ?? null;
+}
+
+function resolvePrimaryArtifact(sessionName: string): string | null {
+  const fromMap = resolveArtifactForSessionName(sessionName);
+  if (fromMap) return fromMap;
+  const base = sessionName.replace(/^repair-\d+-/, '');
+  return PRIMARY_ARTIFACT_MAP[base] ?? null;
+}
 
 function getWorktreePath(run: Run): string | undefined {
   for (const session of run.sessions) {

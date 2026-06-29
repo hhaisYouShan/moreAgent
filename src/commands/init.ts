@@ -244,11 +244,12 @@ export function initCommand(profile: InitProfile = 'mvp'): void {
 
   console.log(`\nInitialized at ${dir}`);
   console.log('Created:');
-  console.log('  config.yaml     — Agent and runtime configuration');
-  console.log('  sessions.json   — Session tracking');
-  console.log('  tasks.json      — Task queue');
-  console.log('  runs/           — Run output directory');
-  console.log('  worktrees/      — Git worktree directory');
+  console.log('  config.yaml       — Agent and runtime configuration');
+  console.log('  sessions.json     — Session tracking');
+  console.log('  tasks.json        — Task queue');
+  console.log('  runtime-sessions.json — OpenCode session mappings');
+  console.log('  runs/             — Run output directory');
+  console.log('  worktrees/        — Git worktree directory');
   console.log('  .opencode/agents/ — OpenCode agent definitions');
   console.log('\nNext: edit config.yaml with your project details, then run:');
   console.log('  moreagent start --once --task "your task description"');
