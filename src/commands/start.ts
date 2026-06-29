@@ -197,9 +197,15 @@ function createTaskWorktree(runId: string): string | null {
     console.log(`  Branch: ${branchName}\n`);
     return worktreePath;
   } catch (err: any) {
-    console.log(`  Warning: Could not create git worktree: ${err.message}`);
-    console.log(`  Code-modifying agents will run in current directory.\n`);
-    return null;
+    throw new Error(
+      `Failed to create git worktree for task branch "${branchName}".\n` +
+        `Error: ${err.message}\n\n` +
+        `To fix this:\n` +
+        `  1. Make sure this is a git repository: git init\n` +
+        `  2. Create at least one commit: git add . && git commit -m "Initial commit"\n` +
+        `  3. Check the current branch exists: git rev-parse --abbrev-ref HEAD\n` +
+        `  4. Remove stale worktrees: git worktree list && git worktree prune`
+    );
   }
 }
 
@@ -244,7 +250,7 @@ function resolveWorkingDir(
   agent: AgentConfig,
   taskWorktree: string | null
 ): string {
-  if (taskWorktree && (agent.canModifyCode || agent.role === 'reviewer')) {
+  if (agent.canModifyCode && taskWorktree) {
     return taskWorktree;
   }
   return process.cwd();
