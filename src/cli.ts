@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { initCommand } from './commands/init';
+import { statusCommand } from './commands/status';
 import { startCommand } from './commands/start';
 
 function printHelp(): void {
@@ -13,16 +14,22 @@ Usage:
 Commands:
   init                      Initialize a new MoreAgent project
   start --once --task <...> Run a task through the agent pipeline
+  status                    Show recent run status
 
 Start Options:
   --once                    Run all agents once (required for MVP)
   --task <description>      The task to execute
   --agent <name>            Run a specific agent only (optional)
 
+Status Options:
+  --latest                  Show the latest run in detail
+
 Examples:
   moreagent init
   moreagent start --once --task "add user authentication"
   moreagent start --once --task "refactor database layer" --agent implementer
+  moreagent status
+  moreagent status --latest
 `);
 }
 
@@ -61,6 +68,10 @@ async function main(): Promise<void> {
         await startCommand({ once: true, task, agent });
         break;
       }
+
+      case 'status':
+        statusCommand({ latest: args.includes('--latest') });
+        break;
 
       default:
         console.error(`Unknown command: ${command}`);

@@ -115,6 +115,20 @@ Each run produces artifacts under `.moreagent/runs/<run-id>/`:
 
 Sessions are tracked in `.moreagent/sessions.json` for history and debugging.
 
+### View Status
+
+Show the latest 10 runs:
+
+```bash
+moreagent status
+```
+
+Show the latest run with per-session details:
+
+```bash
+moreagent status --latest
+```
+
 ## Project Structure
 
 ```
