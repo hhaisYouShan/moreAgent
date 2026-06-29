@@ -9,6 +9,7 @@ export interface AdapterOptions {
   sessionId: string;
   prompt: string;
   task: string;
+  primaryArtifact: string;
   workingDir: string;
   artifactDir: string;
   timeout: number;
@@ -27,9 +28,14 @@ export class OpenCodeRuntimeAdapter {
       prompt,
       task,
       options.artifactDir,
+      options.primaryArtifact,
       options.context
     );
-    const args = this.buildArgs(fullPrompt, options.agentName);
+    const args = this.buildArgs(
+      fullPrompt,
+      options.agentName,
+      options.sessionId
+    );
 
     return new Promise<AgentResult>((resolve) => {
       let stdout = '';
@@ -85,28 +91,37 @@ export class OpenCodeRuntimeAdapter {
     prompt: string,
     task: string,
     artifactDir: string,
+    primaryArtifact: string,
     context?: string
   ): string {
+    const primaryPath = path.join(artifactDir, primaryArtifact);
+
     let full = prompt;
 
     full += `\n\n## Task\n${task}`;
 
-    full += `\n\n## Output Directory\nYour artifact output directory is: ${artifactDir}`;
-    full += `\nAll your findings and deliverables MUST be written to files in this directory.`;
+    full += `\n\n## Artifact Output\nYour primary output file is: ${primaryPath}`;
+    full += `\nYou MUST write your complete deliverable to this file.`;
+    full += `\nAll artifact files are in: ${artifactDir}`;
 
     if (context) {
       full += `\n\n## Context from Previous Agents\n${context}`;
     }
 
-    full += `\n\n## Instructions\n1. Read the task carefully and execute it within your working directory.`;
-    full += `\n2. Write your complete output to the appropriate artifact files in ${artifactDir}.`;
+    full += `\n\n## Instructions`;
+    full += `\n1. Execute the task within the working directory.`;
+    full += `\n2. Write your final deliverable to: ${primaryPath}`;
     full += `\n3. Use absolute paths when writing files.`;
 
     return full;
   }
 
-  private buildArgs(prompt: string, agentName: string): string[] {
-    return ['run', '--agent', agentName, prompt];
+  private buildArgs(
+    prompt: string,
+    agentName: string,
+    sessionId: string
+  ): string[] {
+    return ['run', '--agent', agentName, '--session', sessionId, prompt];
   }
 
   private writeLogs(

@@ -73,6 +73,8 @@ export async function startCommand(options: StartOptions): Promise<void> {
     }
     updateSession(runId, session);
 
+    const primaryArtifact = ROLE_ARTIFACT_MAP[agent.role] || 'output.md';
+
     try {
       const result = await adapter.execute({
         opencodePath: config.runtime.opencodePath,
@@ -80,6 +82,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
         sessionId: session.id,
         prompt: agent.prompt,
         task: options.task,
+        primaryArtifact,
         workingDir,
         artifactDir: agentDir,
         timeout: config.runtime.timeout,
