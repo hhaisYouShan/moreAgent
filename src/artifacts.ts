@@ -263,17 +263,20 @@ Decision: CHANGES_REQUESTED
 # Tech Gate Review (Round 2)
 <!-- Final gate review -->
 `,
-  'failure-analysis.md': `Owner: frontend
+  'failure-analysis.md': `Owner: unknown
 
 # Failure Analysis
-<!-- Brain must change the Owner line above to exactly one of:
+<!-- IMPORTANT: Brain must change the Owner line above to EXACTLY ONE of:
 Owner: frontend
-Owner: backend
+Owner: backend  
 Owner: tester
 Owner: product
 Owner: tech-plan
 Owner: unknown
--->
+
+Do NOT keep the default. Base your choice on the test-report/review-report evidence.
+If evidence is insufficient, choose Owner: unknown.
+Do NOT guess. -->
 ## Root Cause
 <!-- Analysis of what went wrong -->
 ## Evidence
