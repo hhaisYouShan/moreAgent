@@ -196,9 +196,17 @@ Tester and reviewer reports support a minimal machine-readable decision protocol
   - `Decision: APPROVED`
   - `Decision: CHANGES_REQUESTED`
 
+MoreAgent now seeds new report templates with default top lines:
+- `test-report.md` starts with `Result: PASS`
+- `review-report.md` starts with `Decision: APPROVED`
+
+The OpenCode prompt for tester/reviewer also explicitly requires exactly one of these machine-readable lines near the top of the report.
+
 Current MVP compatibility behavior:
 - If `test-report.md` does not include `Result: PASS` or `Result: FAIL`, MoreAgent currently treats the tester session as passed.
 - If `review-report.md` does not include `Decision: APPROVED` or `Decision: CHANGES_REQUESTED`, MoreAgent currently treats the reviewer session as passed.
+
+Decision matching is line-based. Text such as `Result: FAILURES: 0` does not count as `Result: FAIL`.
 
 ## First Run (Recommended)
 

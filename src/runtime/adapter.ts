@@ -138,8 +138,21 @@ export class OpenCodeRuntimeAdapter {
     full += `\n1. Your working directory IS the code workspace root.`;
     full += `\n2. Write code using relative paths (e.g. "src/foo.ts") — they resolve to ${workingDir}.`;
     full += `\n3. Write your deliverable to: ${primaryPath}`;
+    full += this.buildArtifactDecisionRules(primaryArtifact);
 
     return full;
+  }
+
+  private buildArtifactDecisionRules(primaryArtifact: string): string {
+    if (primaryArtifact === 'test-report.md') {
+      return `\n4. You MUST include exactly one machine-readable result line near the top:\n   Result: PASS\n   or\n   Result: FAIL`;
+    }
+
+    if (primaryArtifact === 'review-report.md') {
+      return `\n4. You MUST include exactly one machine-readable decision line near the top:\n   Decision: APPROVED\n   or\n   Decision: CHANGES_REQUESTED`;
+    }
+
+    return '';
   }
 
   private buildArgs(

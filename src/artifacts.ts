@@ -58,7 +58,14 @@ const ARTIFACT_TEMPLATES: Record<ArtifactName, string> = {
 ## Next Steps
 <!-- Remaining work or suggestions -->
 `,
-  'test-report.md': `# Test Report
+  'test-report.md': `Result: PASS
+
+# Test Report
+
+<!-- Tester must change the Result line above to exactly one of:
+Result: PASS
+Result: FAIL
+-->
 
 ## Summary
 <!-- Overall test summary -->
@@ -77,7 +84,14 @@ const ARTIFACT_TEMPLATES: Record<ArtifactName, string> = {
 ## Recommendations
 <!-- Suggestions for additional testing -->
 `,
-  'review-report.md': `# Review Report
+  'review-report.md': `Decision: APPROVED
+
+# Review Report
+
+<!-- Reviewer must change the Decision line above to exactly one of:
+Decision: APPROVED
+Decision: CHANGES_REQUESTED
+-->
 
 ## Summary
 <!-- Overall review summary -->
@@ -168,9 +182,9 @@ function getExpectedOutput(role: string): string {
     case 'implementer':
       return 'Code changes documented in implementation-result.md with files changed and decisions made.';
     case 'tester':
-      return 'Test results in test-report.md with pass/fail status and coverage metrics.';
+      return 'Test results in test-report.md with Result: PASS or Result: FAIL near the top, plus coverage metrics.';
     case 'reviewer':
-      return 'Review findings in review-report.md with issues and recommendations.';
+      return 'Review findings in review-report.md with Decision: APPROVED or Decision: CHANGES_REQUESTED near the top, plus issues and recommendations.';
     default:
       return 'Relevant artifacts based on the agent role.';
   }

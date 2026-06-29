@@ -464,14 +464,14 @@ function evaluateTesterArtifact(agentDir: string): ArtifactDecision {
     return { passed: true };
   }
 
-  if (/Result:\s*FAIL/i.test(content)) {
+  if (/^Result:\s*FAIL\s*$/im.test(content)) {
     return {
       passed: false,
       reason: 'Artifact decision failed: test-report.md contains "Result: FAIL"',
     };
   }
 
-  if (/Result:\s*PASS/i.test(content)) {
+  if (/^Result:\s*PASS\s*$/im.test(content)) {
     return { passed: true };
   }
 
@@ -484,14 +484,14 @@ function evaluateReviewerArtifact(agentDir: string): ArtifactDecision {
     return { passed: true };
   }
 
-  if (/Decision:\s*CHANGES_REQUESTED/i.test(content)) {
+  if (/^Decision:\s*CHANGES_REQUESTED\s*$/im.test(content)) {
     return {
       passed: false,
       reason: 'Artifact decision failed: review-report.md contains "Decision: CHANGES_REQUESTED"',
     };
   }
 
-  if (/Decision:\s*APPROVED/i.test(content)) {
+  if (/^Decision:\s*APPROVED\s*$/im.test(content)) {
     return { passed: true };
   }
 
