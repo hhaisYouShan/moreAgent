@@ -2,7 +2,7 @@
 
 import { cleanCommand } from './commands/clean';
 import { diffCommand } from './commands/diff';
-import { initCommand } from './commands/init';
+import { initCommand, type InitProfile } from './commands/init';
 import { inspectCommand } from './commands/inspect';
 import { queueAddCommand, queueListCommand, queueRecoverCommand, queueRetryCommand } from './commands/queue';
 import {
@@ -85,9 +85,15 @@ async function main(): Promise<void> {
 
   try {
     switch (command) {
-      case 'init':
-        initCommand();
+      case 'init': {
+        const profileIdx = args.indexOf('--profile');
+        const profile: InitProfile =
+          profileIdx !== -1 && args[profileIdx + 1] === 'full'
+            ? 'full'
+            : 'mvp';
+        initCommand(profile);
         break;
+      }
 
       case 'start': {
         const useTmux = args.includes('--tmux');

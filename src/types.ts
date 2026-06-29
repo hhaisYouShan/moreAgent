@@ -2,6 +2,7 @@ export interface AgentConfig {
   name: string;
   role: string;
   description?: string;
+  primaryArtifact?: string;
   canModifyCode: boolean;
   branch?: string;
   prompt: string;

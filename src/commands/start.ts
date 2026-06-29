@@ -402,7 +402,7 @@ async function executeAgentSession(
   const agentDir = path.join(ctx.runDir, sessionName);
   fs.mkdirSync(agentDir, { recursive: true });
 
-  const primaryArtifact = ROLE_ARTIFACT_MAP[agent.role] || 'output.md';
+  const primaryArtifact = getPrimaryArtifact(agent);
   writePrimaryArtifactTemplate(agentDir, primaryArtifact);
 
   const context = buildContext(
@@ -680,6 +680,13 @@ const ROLE_ARTIFACT_MAP: Record<string, string> = {
   reviewer: 'review-report.md',
 };
 
+function getPrimaryArtifact(agent: AgentConfig): string {
+  if (agent.primaryArtifact) {
+    return agent.primaryArtifact;
+  }
+  return ROLE_ARTIFACT_MAP[agent.role] || 'output.md';
+}
+
 function createTaskWorktree(runId: string): string | null {
   const branchName = `agent/${runId}`;
   const worktreesDir = path.join(getMoreAgentDir(), 'worktrees');
@@ -835,8 +842,7 @@ function readPrimaryArtifact(
   agent: AgentConfig,
   agentDir: string
 ): string | null {
-  const artifactName = ROLE_ARTIFACT_MAP[agent.role];
-  if (!artifactName) return null;
+  const artifactName = getPrimaryArtifact(agent);
 
   const filePath = path.join(agentDir, artifactName);
   if (!fs.existsSync(filePath)) return null;
@@ -852,11 +858,9 @@ function writeOutputToArtifactIfNeeded(
   agentDir: string,
   stdout: string
 ): void {
-  const artifactName = ROLE_ARTIFACT_MAP[agent.role];
-  if (!artifactName) return;
+  const artifactName = getPrimaryArtifact(agent);
 
   const filePath = path.join(agentDir, artifactName);
-
   if (!isArtifactStillTemplate(filePath)) {
     return;
   }
@@ -864,7 +868,7 @@ function writeOutputToArtifactIfNeeded(
   const title = artifactName
     .replace('.md', '')
     .replace(/-/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+    .replace(/\b\w/g, (c: string) => c.toUpperCase());
 
   const content = `# ${title}
 
@@ -874,7 +878,7 @@ function writeOutputToArtifactIfNeeded(
 
 ${stdout}
 `;
-  updateArtifact(agentDir, artifactName as any, content);
+  updateArtifact(agentDir, artifactName, content);
 }
 
 function printSummary(sessions: Session[]): void {

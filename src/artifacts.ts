@@ -1,133 +1,175 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { ARTIFACT_NAMES, ArtifactName } from './types';
 
-const ARTIFACT_TEMPLATES: Record<ArtifactName, string> = {
+const ARTIFACT_TEMPLATES: Record<string, string> = {
   'task.md': `# Task
-
 ## Objective
 <!-- Task objective will be populated here -->
-
 ## Context
 <!-- Background context from previous agents -->
-
 ## Requirements
 <!-- Specific requirements for this agent -->
-
 ## Expected Output
 <!-- What this agent should produce -->
 `,
   'brain-plan.md': `# Brain Plan
-
 ## Analysis
 <!-- Architecture analysis and design decisions -->
-
 ## Architecture Overview
 <!-- High-level architecture diagram/description -->
-
 ## Implementation Plan
-<!-- Step-by-step implementation plan -->
-
-1. 
-2. 
-3. 
-
+1.
+2.
+3.
 ## Dependencies
 <!-- Dependencies and prerequisites -->
-
 ## Risks
 <!-- Potential risks and mitigations -->
 `,
   'implementation-result.md': `# Implementation Result
-
 ## Summary
 <!-- Brief summary of what was implemented -->
-
 ## Files Changed
-<!-- List of files modified/created -->
 | File | Action | Description |
 |---|---|---|
 | | | |
-
 ## Key Decisions
 <!-- Important decisions made during implementation -->
-
 ## Issues Encountered
 <!-- Problems encountered and how they were resolved -->
-
 ## Next Steps
 <!-- Remaining work or suggestions -->
 `,
   'test-report.md': `Result: PASS
 
 # Test Report
-
 <!-- Tester must change the Result line above to exactly one of:
 Result: PASS
 Result: FAIL
 -->
-
 ## Summary
 <!-- Overall test summary -->
-
 ## Test Results
 | Test | Status | Duration | Notes |
 |---|---|---|---|
 | | | | |
-
 ## Coverage
 <!-- Test coverage metrics -->
-
 ## Failures
 <!-- Details of any test failures -->
-
 ## Recommendations
 <!-- Suggestions for additional testing -->
 `,
   'review-report.md': `Decision: APPROVED
 
 # Review Report
-
 <!-- Reviewer must change the Decision line above to exactly one of:
 Decision: APPROVED
 Decision: CHANGES_REQUESTED
 -->
-
 ## Summary
 <!-- Overall review summary -->
-
 ## Code Quality
 <!-- Assessment of code quality -->
-
 ## Issues Found
 | Severity | File | Line | Description |
 |---|---|---|---|
 | | | | |
-
 ## Test Coverage Review
 <!-- Assessment of test quality and coverage -->
-
 ## Recommendations
 <!-- Actionable feedback for improvements -->
+`,
+  'prd.md': `# Product Requirements Document
+## Overview
+<!-- Product overview and goals -->
+## Scope
+<!-- In scope / out of scope -->
+## User Stories
+1.
+2.
+3.
+## Acceptance Criteria
+1.
+2.
+3.
+## Open Questions
+<!-- Unresolved items -->
+`,
+  'frontend-plan.md': `# Frontend Implementation Plan
+## Overview
+<!-- Frontend architecture decisions -->
+## Component Tree
+<!-- Component hierarchy -->
+## Route Design
+<!-- Route structure -->
+## State Management
+<!-- State strategy -->
+## Implementation Steps
+1.
+2.
+3.
+`,
+  'backend-plan.md': `# Backend Implementation Plan
+## Overview
+<!-- Backend architecture decisions -->
+## API Design
+<!-- Endpoint specifications -->
+## Data Model
+<!-- Schema design -->
+## Implementation Steps
+1.
+2.
+3.
+`,
+  'test-plan.md': `# Test Plan
+## Scope
+<!-- What is being tested -->
+## Test Strategy
+<!-- Approach and tools -->
+## Test Cases
+| ID | Description | Expected Result |
+|---|---|---|
+| | | |
+## Coverage Targets
+<!-- Desired coverage levels -->
+`,
+  'product-review.md': `# Product Review
+## Summary
+<!-- Overall product review -->
+## Requirement Completeness
+<!-- Assessment of requirements -->
+## Scope Alignment
+<!-- Is the implementation aligned with PRD -->
+## Issues
+| Severity | Description |
+|---|---|
+| | |
+`,
+  'tech-review.md': `# Technical Review
+## Summary
+<!-- Overall technical review -->
+## Architecture Assessment
+<!-- Architecture quality -->
+## Code Quality
+<!-- Code quality assessment -->
+## Issues
+| Severity | Description |
+|---|---|
+| | |
+`,
+  'output.md': `# Output
+<!-- Agent output placeholder -->
 `,
 };
 
 export function writeArtifactTemplate(
   artifactDir: string,
-  name: ArtifactName
+  name: string
 ): void {
-  const template = ARTIFACT_TEMPLATES[name];
+  const template = ARTIFACT_TEMPLATES[name] || `# ${name}\n<!-- Agent output -->\n`;
   const filePath = path.join(artifactDir, name);
   fs.writeFileSync(filePath, template, 'utf-8');
-}
-
-export function writeAllArtifactTemplates(artifactDir: string): void {
-  if (!fs.existsSync(artifactDir)) {
-    fs.mkdirSync(artifactDir, { recursive: true });
-  }
-  for (const name of ARTIFACT_NAMES) {
-    writeArtifactTemplate(artifactDir, name);
-  }
 }
 
 export function writePrimaryArtifactTemplate(
@@ -137,7 +179,7 @@ export function writePrimaryArtifactTemplate(
   if (!fs.existsSync(artifactDir)) {
     fs.mkdirSync(artifactDir, { recursive: true });
   }
-  writeArtifactTemplate(artifactDir, primaryArtifact as ArtifactName);
+  writeArtifactTemplate(artifactDir, primaryArtifact);
 }
 
 export function writeTaskMarkdown(
@@ -168,7 +210,7 @@ ${getExpectedOutput(agentRole)}
 
 export function updateArtifact(
   artifactDir: string,
-  name: ArtifactName,
+  name: string,
   content: string
 ): void {
   const filePath = path.join(artifactDir, name);
@@ -178,13 +220,16 @@ export function updateArtifact(
 function getExpectedOutput(role: string): string {
   switch (role) {
     case 'architect':
-      return 'A detailed brain-plan.md with architecture design and implementation steps.';
+    case 'product':
+      return 'A detailed plan document with design and implementation steps.';
     case 'implementer':
-      return 'Code changes documented in implementation-result.md with files changed and decisions made.';
+    case 'frontend':
+    case 'backend':
+      return 'Code changes documented with files changed and decisions made.';
     case 'tester':
-      return 'Test results in test-report.md with Result: PASS or Result: FAIL near the top, plus coverage metrics.';
+      return 'Test results with Result: PASS or Result: FAIL near the top, plus coverage metrics.';
     case 'reviewer':
-      return 'Review findings in review-report.md with Decision: APPROVED or Decision: CHANGES_REQUESTED near the top, plus issues and recommendations.';
+      return 'Review findings with Decision: APPROVED or Decision: CHANGES_REQUESTED near the top, plus issues and recommendations.';
     default:
       return 'Relevant artifacts based on the agent role.';
   }
