@@ -121,6 +121,11 @@ interface AgentRunResult {
   agentDir: string;
 }
 
+interface ArtifactDecision {
+  passed: boolean;
+  reason?: string;
+}
+
 async function runSequentialPipeline(ctx: PipelineContext): Promise<boolean> {
   for (const agent of ctx.agents) {
     const session = ctx.run.sessions.find((s) => s.agentName === agent.name)!;
@@ -346,6 +351,20 @@ async function executeAgentSession(
     session.completedAt = new Date().toISOString();
     writeOutputToArtifactIfNeeded(agent, agentDir, result.output);
     const artifactContent = readPrimaryArtifact(agent, agentDir);
+    const artifactDecision = evaluateArtifactDecision(agent, agentDir);
+    if (!artifactDecision.passed) {
+      session.status = 'failed';
+      session.error = artifactDecision.reason;
+      updateSession(ctx.run.id, session);
+      console.log(`  Failed: ${artifactDecision.reason}`);
+      console.log('');
+      return {
+        session,
+        success: false,
+        artifactContent: artifactContent ?? undefined,
+        agentDir,
+      };
+    }
     if (artifactContent) {
       ctx.artifactContexts.push(`[${sessionName} (${agent.role})]\n${artifactContent}`);
     }
@@ -422,6 +441,74 @@ function buildFailureContext(
   }
 
   return sections.join('\n\n');
+}
+
+function evaluateArtifactDecision(
+  agent: AgentConfig,
+  agentDir: string
+): ArtifactDecision {
+  if (agent.role === 'tester') {
+    return evaluateTesterArtifact(agentDir);
+  }
+
+  if (agent.role === 'reviewer') {
+    return evaluateReviewerArtifact(agentDir);
+  }
+
+  return { passed: true };
+}
+
+function evaluateTesterArtifact(agentDir: string): ArtifactDecision {
+  const content = readArtifactForDecision(agentDir, 'test-report.md');
+  if (!content) {
+    return { passed: true };
+  }
+
+  if (/Result:\s*FAIL/i.test(content)) {
+    return {
+      passed: false,
+      reason: 'Artifact decision failed: test-report.md contains "Result: FAIL"',
+    };
+  }
+
+  if (/Result:\s*PASS/i.test(content)) {
+    return { passed: true };
+  }
+
+  return { passed: true };
+}
+
+function evaluateReviewerArtifact(agentDir: string): ArtifactDecision {
+  const content = readArtifactForDecision(agentDir, 'review-report.md');
+  if (!content) {
+    return { passed: true };
+  }
+
+  if (/Decision:\s*CHANGES_REQUESTED/i.test(content)) {
+    return {
+      passed: false,
+      reason: 'Artifact decision failed: review-report.md contains "Decision: CHANGES_REQUESTED"',
+    };
+  }
+
+  if (/Decision:\s*APPROVED/i.test(content)) {
+    return { passed: true };
+  }
+
+  return { passed: true };
+}
+
+function readArtifactForDecision(
+  agentDir: string,
+  artifactName: string
+): string | null {
+  const filePath = path.join(agentDir, artifactName);
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+
+  const content = fs.readFileSync(filePath, 'utf-8').trim();
+  return content.length > 0 ? content : null;
 }
 
 function createSession(

@@ -57,6 +57,7 @@ moreagent start --once --task "add a dark mode toggle to settings"
 If `tester` fails, MoreAgent will retry from `implementer` and then rerun `tester`.
 If `reviewer` fails, MoreAgent will retry from `implementer` and then rerun `tester` and `reviewer`.
 The MVP retries at most 2 repair rounds in the same task worktree. It does not auto-merge or auto-push.
+Repair loop triggers when the agent process fails or when the tester/reviewer artifact decision is marked as failed.
 Repair session names such as `repair-1-implementer` are only used by MoreAgent for sessions and artifact directories; OpenCode still reuses the original agents like `implementer`, `tester`, and `reviewer`.
 
 Example output:
@@ -186,6 +187,18 @@ Each run produces per-agent artifacts:
 - `implementation-result.md` — Implementation details
 - `test-report.md` — Test results
 - `review-report.md` — Review findings
+
+Tester and reviewer reports support a minimal machine-readable decision protocol:
+- `test-report.md`:
+  - `Result: PASS`
+  - `Result: FAIL`
+- `review-report.md`:
+  - `Decision: APPROVED`
+  - `Decision: CHANGES_REQUESTED`
+
+Current MVP compatibility behavior:
+- If `test-report.md` does not include `Result: PASS` or `Result: FAIL`, MoreAgent currently treats the tester session as passed.
+- If `review-report.md` does not include `Decision: APPROVED` or `Decision: CHANGES_REQUESTED`, MoreAgent currently treats the reviewer session as passed.
 
 ## First Run (Recommended)
 
