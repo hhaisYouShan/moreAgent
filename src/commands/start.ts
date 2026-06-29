@@ -157,14 +157,36 @@ export async function runTaskOnce(options: StartOptions): Promise<TaskRunResult>
   const adapter = new OpenCodeRuntimeAdapter();
   const artifactContexts: string[] = [];
   const agentByRole = new Map(agents.map((agent) => [agent.role, agent]));
+  const hasFullWorkflow =
+    !options.agent &&
+    agentByRole.has('brain') &&
+    agentByRole.has('product') &&
+    agentByRole.has('frontend') &&
+    agentByRole.has('backend') &&
+    agentByRole.has('tester') &&
+    agentByRole.has('reviewer');
   const hasRepairFlow =
+    !hasFullWorkflow &&
     !options.agent &&
     agentByRole.has('implementer') &&
     agentByRole.has('tester') &&
     agentByRole.has('reviewer');
 
-  const pipelineSucceeded = hasRepairFlow
-    ? await runRepairPipeline({
+  const pipelineSucceeded = hasFullWorkflow
+    ? await runFullWorkflow({
+      config,
+      options,
+      run,
+      runDir,
+      taskWorktree,
+      agents,
+      adapter,
+      artifactContexts,
+      tmux,
+      agentByRole,
+    })
+    : hasRepairFlow
+      ? await runRepairPipeline({
       config,
       options,
       run,
@@ -222,6 +244,146 @@ interface AgentRunResult {
 interface ArtifactDecision {
   passed: boolean;
   reason?: string;
+}
+
+async function runFullWorkflow(
+  ctx: PipelineContext & { agentByRole: Map<string, AgentConfig> }
+): Promise<boolean> {
+  const { agentByRole } = ctx;
+  const brain = agentByRole.get('brain')!;
+  const product = agentByRole.get('product')!;
+  const frontend = agentByRole.get('frontend')!;
+  const backend = agentByRole.get('backend')!;
+  const tester = agentByRole.get('tester')!;
+  const reviewer = agentByRole.get('reviewer')!;
+  const MAX_GATE_ROUNDS = 2;
+
+  const runAgent = async (
+    agent: AgentConfig,
+    sessionName: string,
+    extraCtx?: string | null,
+    override?: string
+  ) => {
+    const session = ensureSessionForRun(ctx.run, agent, sessionName, ctx.runDir);
+    return executeAgentSession({
+      ...ctx, agent, session, sessionName,
+      extraContext: extraCtx ?? '',
+      primaryArtifactOverride: override,
+    });
+  };
+
+  const readArtifact = (agentObj: AgentConfig, dir: string) => {
+    const art = getPrimaryArtifact(agentObj);
+    return readArtifactFromDir(dir, art);
+  };
+
+  // Phase 1: Brain analysis
+  console.log('\n=== Phase 1: Task Analysis ===');
+  const brainRes = await runAgent(brain, 'brain');
+  if (!brainRes.success) return false;
+
+  // Phase 2: Product PRD
+  console.log('\n=== Phase 2: Product PRD ===');
+  const prdRes = await runAgent(product, 'product', readArtifact(brain, brainRes.agentDir));
+  if (!prdRes.success) return false;
+
+  // Phase 3: PRD Review Meeting
+  console.log('\n=== Phase 3: PRD Review Meeting ===');
+  const prdCtx = readArtifact(product, prdRes.agentDir);
+  const fePrdReview = await runAgent(frontend, 'frontend-prd-review', prdCtx, 'frontend-prd-review.md');
+  const bePrdReview = await runAgent(backend, 'backend-prd-review', prdCtx, 'backend-prd-review.md');
+  const testPrdReview = await runAgent(tester, 'test-prd-review', prdCtx, 'test-prd-review.md');
+
+  // Phase 4-5: PRD Gate (up to MAX_GATE_ROUNDS revisions)
+  console.log('\n=== Phase 4-5: PRD Gate ===');
+  let prdPassed = false;
+  for (let round = 1; round <= MAX_GATE_ROUNDS + 1; round++) {
+    const reviewCtx = [
+      readArtifact(frontend, fePrdReview.agentDir),
+      readArtifact(backend, bePrdReview.agentDir),
+      readArtifact(tester, testPrdReview.agentDir),
+    ].filter(Boolean).join('\n\n---\n\n');
+
+    const gateSessionName = `prd-gate-${round}`;
+    const gateRes = await runAgent(brain, gateSessionName, reviewCtx, 'prd-decision.md');
+    if (!gateRes.success) return false;
+
+    const gateDecision = evaluateGateArtifactFile(gateRes.agentDir, 'prd-decision.md');
+    if (gateDecision.passed) { prdPassed = true; break; }
+    if (round > MAX_GATE_ROUNDS) return false;
+
+    console.log(`  PRD gate round ${round} failed, revising...`);
+    const revisedPrd = await runAgent(product, `product-revision-${round}`, reviewCtx);
+    if (!revisedPrd.success) return false;
+  }
+  if (!prdPassed) return false;
+
+  // Phase 6: Tech Plans
+  console.log('\n=== Phase 6: Technical Plans ===');
+  const fePlan = await runAgent(frontend, 'frontend-plan');
+  const bePlan = await runAgent(backend, 'backend-plan');
+  const testPlan = await runAgent(tester, 'test-plan', '', 'test-plan.md');
+  if (!fePlan.success || !bePlan.success || !testPlan.success) return false;
+
+  // Phase 7: Tech Gate
+  console.log('\n=== Phase 7: Tech Gate ===');
+  let techPassed = false;
+  for (let round = 1; round <= MAX_GATE_ROUNDS + 1; round++) {
+    const techCtx = [
+      readArtifact(frontend, fePlan.agentDir),
+      readArtifact(backend, bePlan.agentDir),
+      readArtifact(tester, testPlan.agentDir),
+    ].filter(Boolean).join('\n\n---\n\n');
+
+    const techGateRes = await runAgent(brain, `tech-gate-${round}`, techCtx, 'tech-review.md');
+    if (!techGateRes.success) return false;
+
+    const techDecision = evaluateGateArtifactFile(techGateRes.agentDir, 'tech-review.md');
+    if (techDecision.passed) { techPassed = true; break; }
+    if (round > MAX_GATE_ROUNDS) return false;
+
+    console.log(`  Tech gate round ${round} failed, revising...`);
+    const reviseFe = await runAgent(frontend, `frontend-plan-revision-${round}`);
+    const reviseBe = await runAgent(backend, `backend-plan-revision-${round}`);
+    const reviseTest = await runAgent(tester, `test-plan-revision-${round}`, '', 'test-plan.md');
+    if (!reviseFe.success || !reviseBe.success || !reviseTest.success) return false;
+  }
+  if (!techPassed) return false;
+
+  // Phase 8: Implementation
+  console.log('\n=== Phase 8: Implementation ===');
+  const feImpl = await runAgent(frontend, 'frontend-implementation', '', 'frontend-implementation.md');
+  const beImpl = await runAgent(backend, 'backend-implementation', '', 'backend-implementation.md');
+  if (!feImpl.success || !beImpl.success) return false;
+
+  // Phase 9: Testing
+  console.log('\n=== Phase 9: Testing ===');
+  const testRes = await runAgent(tester, 'tester');
+  if (!testRes.success) return false;
+
+  // Phase 10: Review
+  console.log('\n=== Phase 10: Code Review ===');
+  const reviewRes = await runAgent(reviewer, 'reviewer');
+  return reviewRes.success;
+}
+
+function evaluateGateArtifactFile(agentDir: string, fileName: string): ArtifactDecision {
+  const content = readArtifactFromDir(agentDir, fileName);
+  if (!content) return { passed: true };
+  if (/^Decision:\s*CHANGES_REQUESTED\s*$/im.test(content)) {
+    return { passed: false, reason: `Gate decision: ${fileName} contains "Decision: CHANGES_REQUESTED"` };
+  }
+  if (/^Decision:\s*APPROVED\s*$/im.test(content)) {
+    return { passed: true };
+  }
+  return { passed: true };
+}
+
+function readArtifactFromDir(agentDir: string, fileName: string): string | null {
+  const fp = path.join(agentDir, fileName);
+  if (!fs.existsSync(fp)) return null;
+  const c = fs.readFileSync(fp, 'utf-8').trim();
+  return c.length > 0 ? c : null;
 }
 
 async function runSequentialPipeline(ctx: PipelineContext): Promise<boolean> {
@@ -393,16 +555,17 @@ async function executeAgentSession(
     session: Session;
     sessionName: string;
     extraContext: string;
+    primaryArtifactOverride?: string;
   }
 ): Promise<AgentRunResult> {
-  const { agent, session, sessionName, extraContext } = ctx;
+  const { agent, session, sessionName, extraContext, primaryArtifactOverride } = ctx;
 
   console.log(`--- Agent: ${sessionName} (${agent.role}) ---`);
 
   const agentDir = path.join(ctx.runDir, sessionName);
   fs.mkdirSync(agentDir, { recursive: true });
 
-  const primaryArtifact = getPrimaryArtifact(agent);
+  const primaryArtifact = primaryArtifactOverride ?? getPrimaryArtifact(agent);
   writePrimaryArtifactTemplate(agentDir, primaryArtifact);
 
   const context = buildContext(
@@ -596,6 +759,30 @@ function evaluateArtifactDecision(
     return evaluateReviewerArtifact(agentDir);
   }
 
+  if (agent.role === 'brain') {
+    return evaluateGateArtifact(agentDir);
+  }
+
+  return { passed: true };
+}
+
+function evaluateGateArtifact(agentDir: string): ArtifactDecision {
+  const decisionFiles = ['prd-decision.md', 'tech-review.md'];
+  for (const file of decisionFiles) {
+    const content = readArtifactForDecision(agentDir, file);
+    if (!content) {
+      continue;
+    }
+    if (/^Decision:\s*CHANGES_REQUESTED\s*$/im.test(content)) {
+      return {
+        passed: false,
+        reason: `Artifact decision failed: ${file} contains "Decision: CHANGES_REQUESTED"`,
+      };
+    }
+    if (/^Decision:\s*APPROVED\s*$/im.test(content)) {
+      return { passed: true };
+    }
+  }
   return { passed: true };
 }
 

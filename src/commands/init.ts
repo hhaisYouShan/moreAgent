@@ -68,6 +68,14 @@ project:
   description: ""
 
 agents:
+  - name: brain
+    role: brain
+    description: "Orchestrator — analyzes requirements, splits work, and reviews gates"
+    primaryArtifact: brain-plan.md
+    canModifyCode: false
+    prompt: |
+      You are an orchestrator agent. Analyze the user's task, break it into phases, produce a high-level plan, and review PRD/tech gates. You MUST include "Decision: APPROVED" or "Decision: CHANGES_REQUESTED" at the top of gate review artifacts.
+
   - name: product
     role: product
     description: "Product manager — writes PRD and clarifies requirements"
@@ -160,6 +168,11 @@ const MVP_OPENCODE_AGENTS: Record<string, string> = {
 };
 
 const FULL_OPENCODE_AGENTS: Record<string, string> = {
+  brain: buildOpenCodeAgentFile(
+    'brain',
+    'Orchestrator — analyzes requirements, splits work, reviews gates.',
+    'You are an orchestrator agent. Analyze tasks, produce high-level plans, and review PRD/tech gates. You MUST include "Decision: APPROVED" or "Decision: CHANGES_REQUESTED" at the top of gate review artifacts.'
+  ),
   product: buildOpenCodeAgentFile(
     'product',
     'Product manager — writes PRD, clarifies requirements, defines acceptance criteria.',

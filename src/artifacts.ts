@@ -12,20 +12,6 @@ const ARTIFACT_TEMPLATES: Record<string, string> = {
 ## Expected Output
 <!-- What this agent should produce -->
 `,
-  'brain-plan.md': `# Brain Plan
-## Analysis
-<!-- Architecture analysis and design decisions -->
-## Architecture Overview
-<!-- High-level architecture diagram/description -->
-## Implementation Plan
-1.
-2.
-3.
-## Dependencies
-<!-- Dependencies and prerequisites -->
-## Risks
-<!-- Potential risks and mitigations -->
-`,
   'implementation-result.md': `# Implementation Result
 ## Summary
 <!-- Brief summary of what was implemented -->
@@ -146,21 +132,98 @@ Decision: CHANGES_REQUESTED
 |---|---|
 | | |
 `,
-  'tech-review.md': `# Technical Review
-## Summary
-<!-- Overall technical review -->
-## Architecture Assessment
-<!-- Architecture quality -->
-## Code Quality
-<!-- Code quality assessment -->
+  'output.md': `# Output
+<!-- Agent output placeholder -->
+`,
+  'brain-plan.md': `# Brain Plan
+## Task Analysis
+<!-- High-level analysis of the task -->
+## Work Phases
+1.
+2.
+3.
+## Dependencies
+<!-- Cross-cutting concerns -->
+`,
+  'frontend-prd-review.md': `Decision: CHANGES_REQUESTED
+
+# Frontend PRD Review
+## Feasibility
+<!-- Technical feasibility assessment -->
+## UI Concerns
+<!-- UI/UX considerations -->
 ## Issues
 | Severity | Description |
 |---|---|
 | | |
 `,
-  'output.md': `# Output
-<!-- Agent output placeholder -->
+  'backend-prd-review.md': `Decision: CHANGES_REQUESTED
+
+# Backend PRD Review
+## Feasibility
+<!-- Technical feasibility assessment -->
+## API / Data Concerns
+<!-- API and data model considerations -->
+## Issues
+| Severity | Description |
+|---|---|
+| | |
 `,
+  'test-prd-review.md': `Decision: CHANGES_REQUESTED
+
+# Test PRD Review
+## Testability
+<!-- Assessment of testability -->
+## Coverage Concerns
+<!-- Coverage gaps in the PRD -->
+## Issues
+| Severity | Description |
+|---|---|
+| | |
+`,
+  'prd-decision.md': `Decision: APPROVED
+
+# PRD Gate Decision
+## Verdict
+<!-- APPROVED or CHANGES_REQUESTED -->
+## Issues Addressed
+<!-- Summary of resolved issues -->
+## Remaining Concerns
+<!-- Any unresolved items -->
+`,
+  'tech-review.md': `Decision: APPROVED
+
+# Technical Review
+## Verdict
+<!-- APPROVED or CHANGES_REQUESTED -->
+## Architecture Assessment
+<!-- Overall architecture quality -->
+## Issues
+| Component | Severity | Description |
+|---|---|---|
+| | | |
+`,
+  'frontend-implementation.md': `# Frontend Implementation
+## Summary
+<!-- What was implemented -->
+## Files Changed
+| File | Action | Description |
+|---|---|---|
+| | | |
+## Key Decisions
+<!-- Important choices made -->
+`,
+  'backend-implementation.md': `# Backend Implementation
+## Summary
+<!-- What was implemented -->
+## Files Changed
+| File | Action | Description |
+|---|---|---|
+| | | |
+## Key Decisions
+<!-- Important choices made -->
+`,
+
 };
 
 export function writeArtifactTemplate(
