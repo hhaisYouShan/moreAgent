@@ -32,6 +32,8 @@ export async function startCommand(options: StartOptions): Promise<void> {
     throw new Error(`No agent found with name "${options.agent}"`);
   }
 
+  const taskWorktree = createTaskWorktree(runId);
+
   const run: Run = {
     id: runId,
     task: options.task,
@@ -47,7 +49,7 @@ export async function startCommand(options: StartOptions): Promise<void> {
 
   const adapter = new OpenCodeRuntimeAdapter();
 
-  let previousOutput = '';
+  const artifactContexts: string[] = [];
 
   for (const agent of agents) {
     console.log(`--- Agent: ${agent.name} (${agent.role}) ---`);
@@ -57,37 +59,41 @@ export async function startCommand(options: StartOptions): Promise<void> {
 
     fs.mkdirSync(agentDir, { recursive: true });
     writeAllArtifactTemplates(agentDir);
-    writeTaskMarkdown(agentDir, agent.name, agent.role, options.task, previousOutput);
 
-    const worktreePath = setupWorktree(agent, runId);
+    const context = buildContext(artifactContexts);
+    writeTaskMarkdown(agentDir, agent.name, agent.role, options.task, context);
 
-    let workingDir = process.cwd();
-    if (worktreePath) {
-      workingDir = worktreePath;
-      const sessionToUpdate = sessions.find((s) => s.agentName === agent.name)!;
-      sessionToUpdate.worktreePath = worktreePath;
-    }
+    const workingDir = resolveWorkingDir(agent, taskWorktree);
 
     session.status = 'running';
     session.startedAt = new Date().toISOString();
+    if (workingDir !== process.cwd()) {
+      session.worktreePath = workingDir;
+    }
     updateSession(runId, session);
 
     try {
       const result = await adapter.execute({
         opencodePath: config.runtime.opencodePath,
         agentName: agent.name,
+        sessionId: session.id,
         prompt: agent.prompt,
         task: options.task,
         workingDir,
         artifactDir: agentDir,
         timeout: config.runtime.timeout,
-        context: previousOutput,
+        context,
       });
 
       if (result.success) {
         session.status = 'completed';
-        previousOutput = result.output;
-        await saveAgentOutput(agent, agentDir, result.output);
+        saveAgentOutput(agent, agentDir, result.output);
+        const artifactContent = readPrimaryArtifact(agent, agentDir);
+        if (artifactContent) {
+          artifactContexts.push(
+            `[${agent.name} (${agent.role})]\n${artifactContent}`
+          );
+        }
         console.log(`  Completed in ${(result.duration / 1000).toFixed(1)}s`);
       } else {
         session.status = 'failed';
@@ -113,6 +119,9 @@ export async function startCommand(options: StartOptions): Promise<void> {
 
   console.log(`Run ${runId} ${run.status}`);
   console.log(`Artifacts: ${runDir}`);
+  if (taskWorktree) {
+    console.log(`Worktree: ${taskWorktree}`);
+  }
   printSummary(sessions);
 }
 
@@ -137,49 +146,37 @@ function generateRunId(): string {
   return `run-${dateStr}-${uuidv4().slice(0, 6)}`;
 }
 
-function setupWorktree(
-  agent: AgentConfig,
-  runId: string
-): string | null {
-  if (!agent.canModifyCode) {
-    return null;
-  }
+const ROLE_ARTIFACT_MAP: Record<string, string> = {
+  architect: 'brain-plan.md',
+  implementer: 'implementation-result.md',
+  tester: 'test-report.md',
+  reviewer: 'review-report.md',
+};
 
+function createTaskWorktree(runId: string): string | null {
+  const branchName = `agent/${runId}`;
   const worktreesDir = path.join(getMoreAgentDir(), 'worktrees');
-  const worktreeName = `${agent.name}-${runId}`;
-  const worktreePath = path.join(worktreesDir, worktreeName);
+  const worktreePath = path.join(worktreesDir, `agent-${runId}`);
 
   if (fs.existsSync(worktreePath)) {
-    console.log(`  Reusing worktree: ${worktreePath}`);
+    console.log(`  Reusing task worktree: ${worktreePath}`);
     return worktreePath;
   }
-
-  const branch = agent.branch || `feature/${agent.name}`;
 
   try {
     const { execSync } = require('child_process');
-
-    execSync(`git worktree add "${worktreePath}" "${branch}"`, {
-      cwd: process.cwd(),
-      stdio: 'pipe',
-    });
-    console.log(`  Created worktree: ${worktreePath} (branch: ${branch})`);
+    const baseBranch = getCurrentBranch();
+    execSync(
+      `git worktree add -b "${branchName}" "${worktreePath}" "${baseBranch}"`,
+      { cwd: process.cwd(), stdio: 'pipe' }
+    );
+    console.log(`  Created task worktree: ${worktreePath}`);
+    console.log(`  Branch: ${branchName}\n`);
     return worktreePath;
   } catch (err: any) {
-    try {
-      const { execSync } = require('child_process');
-      const baseBranch = getCurrentBranch();
-      execSync(`git worktree add -b "${branch}" "${worktreePath}" "${baseBranch}"`, {
-        cwd: process.cwd(),
-        stdio: 'pipe',
-      });
-      console.log(`  Created worktree with new branch: ${worktreePath} (branch: ${branch})`);
-      return worktreePath;
-    } catch (err2: any) {
-      console.log(`  Warning: Could not create git worktree: ${err2.message}`);
-      console.log(`  Running in current directory instead.`);
-      return null;
-    }
+    console.log(`  Warning: Could not create git worktree: ${err.message}`);
+    console.log(`  Code-modifying agents will run in current directory.\n`);
+    return null;
   }
 }
 
@@ -195,35 +192,61 @@ function getCurrentBranch(): string {
   }
 }
 
-async function saveAgentOutput(
+function resolveWorkingDir(
+  agent: AgentConfig,
+  taskWorktree: string | null
+): string {
+  if (agent.canModifyCode && taskWorktree) {
+    return taskWorktree;
+  }
+  return process.cwd();
+}
+
+function buildContext(artifactContexts: string[]): string {
+  if (artifactContexts.length === 0) {
+    return '';
+  }
+  return artifactContexts.join('\n\n---\n\n');
+}
+
+function readPrimaryArtifact(
+  agent: AgentConfig,
+  agentDir: string
+): string | null {
+  const artifactName = ROLE_ARTIFACT_MAP[agent.role];
+  if (!artifactName) return null;
+
+  const filePath = path.join(agentDir, artifactName);
+  if (!fs.existsSync(filePath)) return null;
+
+  const content = fs.readFileSync(filePath, 'utf-8');
+  if (content.trim().length === 0) return null;
+
+  return content;
+}
+
+function saveAgentOutput(
   agent: AgentConfig,
   agentDir: string,
   output: string
-): Promise<void> {
-  const contentMap: Record<string, string> = {
-    architect: 'brain-plan.md',
-    implementer: 'implementation-result.md',
-    tester: 'test-report.md',
-    reviewer: 'review-report.md',
-  };
+): void {
+  const artifactName = ROLE_ARTIFACT_MAP[agent.role];
+  if (!artifactName) return;
 
-  const artifactName = contentMap[agent.role];
-  if (artifactName) {
-    updateArtifact(
-      agentDir,
-      artifactName as any,
-      `# ${artifactName.replace('.md', '').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+  const title = artifactName
+    .replace('.md', '')
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
+  const content = `# ${title}
 
 ## Agent: ${agent.name} (${agent.role})
 
-## Agent Output
+## Output
 
-\`\`\`
 ${output}
-\`\`\`
-`
-    );
-  }
+`;
+  updateArtifact(agentDir, artifactName as any, content);
 }
 
 function printSummary(sessions: Session[]): void {
@@ -231,7 +254,11 @@ function printSummary(sessions: Session[]): void {
   for (const s of sessions) {
     const status = s.status === 'completed' ? 'OK' : 'FAIL';
     const duration = s.completedAt
-      ? ` (${Math.round((new Date(s.completedAt).getTime() - new Date(s.startedAt).getTime()) / 1000)}s)`
+      ? ` (${Math.round(
+          (new Date(s.completedAt).getTime() -
+            new Date(s.startedAt).getTime()) /
+            1000
+        )}s)`
       : '';
     console.log(`  ${s.agentName}: ${status}${duration}`);
     if (s.error) {

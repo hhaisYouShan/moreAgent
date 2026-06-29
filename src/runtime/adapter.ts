@@ -1,10 +1,10 @@
 import { spawn } from 'child_process';
-import * as path from 'path';
 import { AgentResult } from '../types';
 
 export interface AdapterOptions {
   opencodePath: string;
   agentName: string;
+  sessionId: string;
   prompt: string;
   task: string;
   workingDir: string;
@@ -21,8 +21,13 @@ export class OpenCodeRuntimeAdapter {
     const { opencodePath, prompt, task, workingDir, timeout } = options;
     const effectiveTimeout = timeout || this.defaultTimeout;
 
-    const fullPrompt = this.buildFullPrompt(prompt, task, options.context);
-    const args = this.buildArgs(fullPrompt);
+    const fullPrompt = this.buildFullPrompt(
+      prompt,
+      task,
+      options.artifactDir,
+      options.context
+    );
+    const args = this.buildArgs(fullPrompt, options.agentName, options.sessionId);
 
     return new Promise<AgentResult>((resolve) => {
       let stdout = '';
@@ -30,10 +35,6 @@ export class OpenCodeRuntimeAdapter {
 
       const proc = spawn(opencodePath, args, {
         cwd: workingDir,
-        env: {
-          ...process.env,
-          OPENCODE_SESSION_ID: `${options.agentName}-${Date.now()}`,
-        },
       });
 
       const timer = setTimeout(() => {
@@ -79,18 +80,32 @@ export class OpenCodeRuntimeAdapter {
   private buildFullPrompt(
     prompt: string,
     task: string,
+    artifactDir: string,
     context?: string
   ): string {
-    let full = `${prompt}\n\n## Current Task\n${task}`;
+    let full = prompt;
+
+    full += `\n\n## Task\n${task}`;
+
+    full += `\n\n## Output Directory\nYour artifact output directory is: ${artifactDir}`;
+    full += `\nAll your findings and deliverables MUST be written to files in this directory.`;
+
     if (context) {
       full += `\n\n## Context from Previous Agents\n${context}`;
     }
-    full +=
-      '\n\n## Instructions\nComplete the task and write your findings to the appropriate artifact files in the output directory.';
+
+    full += `\n\n## Instructions\n1. Read the task carefully and execute it within your working directory.`;
+    full += `\n2. Write your complete output to the appropriate artifact files in ${artifactDir}.`;
+    full += `\n3. Use absolute paths when writing files.`;
+
     return full;
   }
 
-  private buildArgs(prompt: string): string[] {
-    return ['run', prompt];
+  private buildArgs(
+    prompt: string,
+    agentName: string,
+    sessionId: string
+  ): string[] {
+    return ['run', '--agent', agentName, '--session', sessionId, prompt];
   }
 }
