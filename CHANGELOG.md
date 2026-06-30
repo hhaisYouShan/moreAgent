@@ -1,5 +1,13 @@
 # Changelog
 
+## V1.8.1 (2026-06-30)
+
+### Fixed
+- **JSON error hardening**: `exitWithError()` helper ensures all `--json` error paths output valid JSON (not text). Replaced 9 `console.error + process.exit(1)` calls in `cli.ts` with unified `exitWithError(message)` that checks `--json` flag.
+- **`inspect --workflow --json`** on non-full workflow runs now returns `NOT_FULL_WORKFLOW` error JSON instead of rendering text.
+- **Error codes added**: `BAD_ARGS` (CLI argument errors), `NOT_FULL_WORKFLOW` (inspect --workflow on non-full run).
+- 4 new boundary JSON tests: empty sessions, unknown command, start --resume without --run, inspect --workflow on non-full run (30 total).
+
 ## V1.8 (2026-06-30)
 
 ### Added

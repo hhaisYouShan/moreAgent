@@ -495,6 +495,7 @@ test('JSON: unknown command --json returns JSON error', () => {
   assert(r.status !== 0, 'should exit non-zero');
   const data = JSON.parse(r.stdout);
   assert(data.error, 'missing error object');
+  assert(data.error.code === 'BAD_ARGS', `expected BAD_ARGS, got ${data.error.code}`);
   assert(!r.stdout.includes('MoreAgent'), 'stdout should NOT contain help text');
 });
 
@@ -503,6 +504,7 @@ test('JSON: start --resume --json without --run returns JSON error', () => {
   assert(r.status !== 0, 'should exit non-zero');
   const data = JSON.parse(r.stdout);
   assert(data.error, 'missing error object');
+  assert(data.error.code === 'BAD_ARGS', `expected BAD_ARGS, got ${data.error.code}`);
 });
 
 // ============================================================
