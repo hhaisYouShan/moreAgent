@@ -50,6 +50,7 @@ Commands:
   report --run <id>         Show workflow report for specific run
   dashboard                 Generate static HTML dashboard
   dashboard --run <id>      Generate dashboard with specific run selected
+  dashboard --open          Generate and open in default browser
   clean                     Clean runs or worktrees
   sessions list             List agent runtime session mappings
   sessions reset --agent <n> Reset one agent's runtime session
@@ -90,6 +91,7 @@ Examples:
   moreagent dashboard --run run-2026-06-29T12-00-00-abc123
   moreagent dashboard --limit 5
   moreagent dashboard --output /tmp/dash.html
+  moreagent dashboard --open
   moreagent clean --runs
   moreagent clean --worktrees
   moreagent clean --all
@@ -281,6 +283,7 @@ async function main(): Promise<void> {
           run: dashRunId,
           limit: dashLimit,
           output: dashOutput,
+          open: args.includes('--open'),
         });
         break;
       }

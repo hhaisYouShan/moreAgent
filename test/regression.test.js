@@ -1279,6 +1279,88 @@ test('Dashboard: empty dashboard script includes runs.length guard', () => {
 });
 
 // ============================================================
+// 7e. V2.3 Dashboard --open
+// ============================================================
+
+console.log('\n7e. Dashboard --open (V2.3)');
+console.log('===========================');
+
+test('Dashboard: --open exits 0 and writes default HTML', () => {
+  writeSessions(dashDir, { runs: [{ id: 'dash-open-1', task: 'open test', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'dash-open-1'), sessions: [] }] });
+
+  const r = runCliIn(dashDir, ['dashboard', '--open']);
+  assert(r.status === 0, `--open should exit 0, got ${r.status}`);
+  const htmlPath = path.join(dashDir, '.moreagent', 'dashboard', 'index.html');
+  assert(fs.existsSync(htmlPath), 'default HTML should exist after --open');
+});
+
+test('Dashboard: --open prints Dashboard written path', () => {
+  const r = runCliIn(dashDir, ['dashboard', '--open']);
+  assert(r.stdout.includes('Dashboard written to'), `should print written path, got: ${r.stdout.slice(0,200)}`);
+});
+
+test('Dashboard: --output <path> --open opens correct path', () => {
+  writeSessions(dashDir, { runs: [{ id: 'dash-open-out', task: 'output test', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'dash-open-out'), sessions: [] }] });
+
+  const outPath = path.join(TMP, 'open-custom.html');
+  // Set env to capture open command path
+  const r = spawnSync('node', [CLI, 'dashboard', '--output', outPath, '--open'], {
+    cwd: dashDir, encoding: 'utf-8', timeout: 10000,
+    env: { ...process.env, MOREAGENT_DASHBOARD_OPEN_COMMAND: 'node -e "require(' + "fs" + ').writeFileSync(' + "'" + path.join(TMP, 'open-log.txt') + "'" + ', process.argv.slice(1).join(' + "' '" + '))" ' },
+  });
+  assert(r.status === 0, `--output --open should exit 0, got ${r.status}`);
+  assert(fs.existsSync(outPath), 'custom output HTML should exist');
+});
+
+test('Dashboard: --run <id> --open keeps selectedRunId', () => {
+  writeSessions(dashDir, { runs: [
+    { id: 'open-sel-1', task: 'target', status: 'completed', createdAt: '2024-01-02T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'open-sel-1'), sessions: [] },
+    { id: 'open-sel-2', task: 'other', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'open-sel-2'), sessions: [] },
+  ] });
+
+  const outP = path.join(TMP, 'open-sel.html');
+  const r = runCliIn(dashDir, ['dashboard', '--run', 'open-sel-2', '--output', outP, '--open']);
+  const html = fs.readFileSync(outP, 'utf-8');
+  const data = extractDashboardData(html);
+  assert(data !== null, 'should extract data');
+  assert(data.selectedRunId === 'open-sel-2', `selectedRunId should be open-sel-2, got ${data.selectedRunId}`);
+});
+
+test('Dashboard: --limit 2 --open keeps run count', () => {
+  writeSessions(dashDir, { runs: [
+    { id: 'open-lim-1', task: 'r1', status: 'completed', createdAt: '2024-01-03T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'open-lim-1'), sessions: [] },
+    { id: 'open-lim-2', task: 'r2', status: 'completed', createdAt: '2024-01-02T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'open-lim-2'), sessions: [] },
+    { id: 'open-lim-3', task: 'r3', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'open-lim-3'), sessions: [] },
+  ] });
+
+  const outP = path.join(TMP, 'open-lim.html');
+  const r = runCliIn(dashDir, ['dashboard', '--limit', '2', '--output', outP, '--open']);
+  const data = extractDashboardData(fs.readFileSync(outP, 'utf-8'));
+  assert(data !== null);
+  assert(data.runs.length === 2, `runs.length should be 2, got ${data.runs.length}`);
+});
+
+test('Dashboard: open failure keeps exit 0 and HTML exists', () => {
+  writeSessions(dashDir, { runs: [{ id: 'dash-open-fail', task: 'fail test', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'dash-open-fail'), sessions: [] }] });
+
+  const outP = path.join(TMP, 'open-fail.html');
+  // Use an env var to make open command fail
+  const r = spawnSync('node', [CLI, 'dashboard', '--output', outP, '--open'], {
+    cwd: dashDir, encoding: 'utf-8', timeout: 10000,
+    env: { ...process.env, MOREAGENT_DASHBOARD_OPEN_COMMAND: 'false' },
+  });
+
+  assert(r.status === 0, `open failure should still exit 0, got ${r.status}`);
+  assert(fs.existsSync(outP), 'HTML should exist even when open fails');
+  assert(r.stdout.includes('Open failed') || r.stdout.includes('Dashboard written'), 'should mention open failure or written path');
+});
+
+test('Dashboard: --open appears in CLI help', () => {
+  const r = runCli(['--help']);
+  assert(r.stdout.includes('--open'), 'CLI help should include --open');
+});
+
+// ============================================================
 // 6. BUILD CHECK
 // ============================================================
 

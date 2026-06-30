@@ -1,5 +1,17 @@
 # Changelog
 
+## V2.3 (2026-06-30)
+
+### Added — Dashboard `--open`
+- **`moreagent dashboard --open`**: generates HTML and opens in default browser
+- Composable with all existing flags: `--run`, `--limit`, `--output`
+- Platform-aware: `open` (macOS), `xdg-open` (Linux), `cmd /c start` (Windows)
+- `MOREAGENT_DASHBOARD_OPEN_COMMAND` env var for testing (not public API)
+- Open failure does not roll back HTML — `exit 0`, file retained, prints "Open failed" + file path
+- Generation failure (model/write error) does not attempt open
+- New helpers: `openInDefaultBrowser(path)` exported via `__dashboardTestHooks`
+- 7 new tests: basic --open, --output path, --run selectedRunId, --limit count, open failure, CLI help
+
 ## V2.2 (2026-06-30)
 
 ### Added — Dashboard Resilience

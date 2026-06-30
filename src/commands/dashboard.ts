@@ -6,6 +6,7 @@ export interface DashboardOptions {
   run?: string;
   limit?: number;
   output?: string;
+  open?: boolean;
 }
 
 interface DashboardError {
@@ -45,6 +46,16 @@ export function dashboardCommand(options: DashboardOptions): void {
   const html = renderDashboardHtml(model);
   writeDashboardHtml(outputPath, html);
   console.log(`Dashboard written to ${outputPath}`);
+
+  if (options.open) {
+    const result = openInDefaultBrowser(outputPath);
+    if (result.ok) {
+      console.log('Opened dashboard in default browser');
+    } else {
+      console.log(`Open failed: ${result.message}`);
+      console.log(`Dashboard was still generated at ${outputPath}`);
+    }
+  }
 }
 
 function getCliPath(): string {
@@ -798,8 +809,38 @@ export function renderEmptyState(type: string): string {
   return '<div class="empty-box">Not available</div>';
 }
 
+export function openInDefaultBrowser(filePath: string): { ok: true } | { ok: false; message: string } {
+  const command = process.env.MOREAGENT_DASHBOARD_OPEN_COMMAND;
+  let cmd: string;
+  let args: string[];
+  if (command) {
+    const parts = command.split(' ');
+    cmd = parts[0];
+    args = [...parts.slice(1), filePath];
+  } else if (process.platform === 'darwin') {
+    cmd = 'open';
+    args = [filePath];
+  } else if (process.platform === 'linux') {
+    cmd = 'xdg-open';
+    args = [filePath];
+  } else if (process.platform === 'win32') {
+    cmd = 'cmd';
+    args = ['/c', 'start', '', filePath];
+  } else {
+    return { ok: false, message: `Unsupported platform: ${process.platform}` };
+  }
+  try {
+    const result = spawnSync(cmd, args, { timeout: 10000, encoding: 'utf-8' });
+    if (result.error) return { ok: false, message: result.error.message };
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, message: e.message || 'Unknown error' };
+  }
+}
+
 export const __dashboardTestHooks = {
   safeText, safeBool, getNested,
   normalizeDecision, normalizeMerge, normalizeWorktree, normalizeGates, normalizeSessions,
   renderErrorBox, renderEmptyState,
+  openInDefaultBrowser,
 };
