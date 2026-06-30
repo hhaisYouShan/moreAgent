@@ -50,13 +50,16 @@ They are useful for rationale and evolution, but not as the only implementation 
 - [V2.3 Dashboard Open Tech Plan](v2.3-dashboard-open-tech-plan.md)
 - [V3.0 Dashboard Serve PRD](v3.0-dashboard-serve-prd.md)
 - [V3.0 Dashboard Serve Tech Plan](v3.0-dashboard-serve-tech-plan.md)
+- [V3.1 Dashboard Serve Usability PRD](v3.1-dashboard-serve-usability-prd.md)
+- [V3.1 Dashboard Serve Usability Tech Plan](v3.1-dashboard-serve-usability-tech-plan.md)
+- [V3.2 Init Full PRD](v3.2-init-full-prd.md)
+- [V3.2 Init Full Tech Plan](v3.2-init-full-tech-plan.md)
 
 ## Future Design Docs
 
 These documents describe pending future work, not current shipped behavior.
 
-- [V3.1 Dashboard Serve Usability PRD](v3.1-dashboard-serve-usability-prd.md)
-- [V3.1 Dashboard Serve Usability Tech Plan](v3.1-dashboard-serve-usability-tech-plan.md)
+- V4.0 — pending review meeting; no design docs yet.
 
 ## Legacy Product / Planning References
 

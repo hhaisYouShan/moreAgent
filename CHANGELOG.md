@@ -9,8 +9,11 @@
 - **CLI validation**: `--profile mvp --full` exits non-zero, `--profile abc` rejected, missing value error
 - **Integration guide** (`.moreagent/integration-guide.md`): 9 phases, 6 roles with artifacts, recommended commands, directory structure, safety notes
 - **Safe idempotency**: re-running `init --full` skips existing files (config, agents, guide); missing files are filled in
+- **Mixed-state protection**: if MVP config exists, `init --full` skips full agents and integration guide with "manual migration required" warning
+- **State file resilience**: missing `tasks.json` / `runtime-sessions.json` / `sessions.json` filled in regardless of config state
+- `tasks.json` structure: `{ "tasks": [] }` (no `nextId`)
 - Refactored `initCommand(profile, options)` with result tracking (created/skipped)
-- 12 new V3.2 tests
+- 15 new V3.2 tests (126 total)
 
 ## V3.1 (2026-06-30)
 
