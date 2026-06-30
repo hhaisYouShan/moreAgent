@@ -266,9 +266,8 @@ async function main(): Promise<void> {
           if (dashLimitIdx === -1) return undefined;
           const v = args[dashLimitIdx + 1];
           if (!v || v.startsWith('-')) exitWithError('Error: --limit requires a positive integer');
-          const n = parseInt(v, 10);
-          if (isNaN(n) || n < 1 || !isFinite(n)) exitWithError('Error: --limit must be a positive integer (got: ' + v + ')');
-          return n;
+          if (!/^[1-9]\d*$/.test(v)) exitWithError('Error: --limit must be a positive integer (got: ' + v + ')');
+          return parseInt(v, 10);
         })();
 
         const dashOutput = (() => {

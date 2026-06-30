@@ -941,6 +941,16 @@ test('Dashboard: --limit -1 exits 1', () => {
   assert(r.status !== 0, `--limit -1 should exit non-zero, got ${r.status}`);
 });
 
+test('Dashboard: --limit partial numeric value exits 1', () => {
+  const r = runCliIn(dashDir, ['dashboard', '--limit', '1abc']);
+  assert(r.status !== 0, `--limit 1abc should exit non-zero, got ${r.status}`);
+});
+
+test('Dashboard: --limit decimal exits 1', () => {
+  const r = runCliIn(dashDir, ['dashboard', '--limit', '1.5']);
+  assert(r.status !== 0, `--limit 1.5 should exit non-zero, got ${r.status}`);
+});
+
 test('Dashboard: --run missing value exits 1', () => {
   const r = runCliIn(dashDir, ['dashboard', '--run']);
   assert(r.status !== 0, `--run with no value should exit non-zero, got ${r.status}`);
