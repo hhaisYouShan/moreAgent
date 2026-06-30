@@ -1,5 +1,22 @@
 # Changelog
 
+## V2.0 (2026-06-30)
+
+### Added
+- **`moreagent dashboard`**: generate static single-file HTML dashboard
+  - `dashboard` — generate latest runs dashboard
+  - `dashboard --run <id>` — select a specific run
+  - `dashboard --limit N` — control number of prefetched runs (default 10)
+  - `dashboard --output <path>` — custom output path
+- **Data assembly**: exclusively consumes existing CLI JSON (`status --json`, `status --run <id> --json`, `report --run <id> --json`, `inspect --run <id> --workflow --json`)
+- **Static HTML** with inline CSS, inline JS, and embedded `window.__MOREAGENT_DASHBOARD_DATA__`
+- **Run details page**: Header, Workflow Report, Gate/Test/Review cards, Repair Sessions, Merge Readiness, Sessions table, JSON/Debug tabs
+- **Local run switching**: click sidebar run item to switch details without CLI calls
+- **Non-full workflow degradation**: MVP runs show "workflow unavailable / MVP run" banner instead of breaking
+- **Error resilience**: per-run detail fetch failures (status/report/workflow) don't block dashboard generation
+- 7 dashboard regression tests (smoke, --output, HTML structure, runDetailsById, MVP degradation, --limit, --run)
+- New `src/commands/dashboard.ts`: `buildDashboardModel`, `renderDashboardHtml`, `writeDashboardHtml`
+
 ## V1.9.1 (2026-06-30)
 
 ### Added

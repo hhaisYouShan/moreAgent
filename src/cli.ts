@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { cleanCommand } from './commands/clean';
+import { dashboardCommand } from './commands/dashboard';
 import { diffCommand } from './commands/diff';
 import { initCommand, type InitProfile } from './commands/init';
 import { inspectCommand } from './commands/inspect';
@@ -47,6 +48,8 @@ Commands:
   inspect --run <id>        Show a specific run
   report --latest           Show workflow report for latest run
   report --run <id>         Show workflow report for specific run
+  dashboard                 Generate static HTML dashboard
+  dashboard --run <id>      Generate dashboard with specific run selected
   clean                     Clean runs or worktrees
   sessions list             List agent runtime session mappings
   sessions reset --agent <n> Reset one agent's runtime session
@@ -83,6 +86,10 @@ Examples:
   moreagent report --latest
   moreagent report --run run-2026-06-29T12-00-00-abc123
   moreagent report --latest --json
+  moreagent dashboard
+  moreagent dashboard --run run-2026-06-29T12-00-00-abc123
+  moreagent dashboard --limit 5
+  moreagent dashboard --output /tmp/dash.html
   moreagent clean --runs
   moreagent clean --worktrees
   moreagent clean --all
@@ -239,6 +246,21 @@ async function main(): Promise<void> {
           latest: args.includes('--latest') && !reportRunId,
           run: reportRunId,
           json: args.includes('--json'),
+        });
+        break;
+      }
+
+      case 'dashboard': {
+        const dashRunIdx = args.indexOf('--run');
+        const dashRunId = dashRunIdx !== -1 ? args[dashRunIdx + 1] : undefined;
+        const dashLimitIdx = args.indexOf('--limit');
+        const dashLimit = dashLimitIdx !== -1 ? parseInt(args[dashLimitIdx + 1], 10) : undefined;
+        const dashOutputIdx = args.indexOf('--output');
+        const dashOutput = dashOutputIdx !== -1 ? args[dashOutputIdx + 1] : undefined;
+        dashboardCommand({
+          run: dashRunId,
+          limit: dashLimit || undefined,
+          output: dashOutput,
         });
         break;
       }

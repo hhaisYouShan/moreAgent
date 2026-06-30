@@ -748,6 +748,144 @@ test('Report: JSON schema field stability', () => {
 });
 
 // ============================================================
+// 7. DASHBOARD (V2.0)
+// ============================================================
+
+console.log('\n7. Dashboard (V2.0)');
+console.log('===================');
+
+let dashDir;
+
+function makeDashDir() {
+  const dir = path.join(TMP, 'dash');
+  fs.mkdirSync(dir, { recursive: true });
+  execSync('git init', { cwd: dir, stdio: 'pipe' });
+  runCliIn(dir, ['init']);
+  execSync('git add -A && git commit -m init', { cwd: dir, stdio: 'pipe' });
+  return dir;
+}
+
+function extractDashboardData(html) {
+  const match = /window\.__MOREAGENT_DASHBOARD_DATA__\s*=\s*([\s\S]*?);\s*(?:\n\s*\()/.exec(html);
+  if (!match) return null;
+  return JSON.parse(match[1]);
+}
+
+test('Dashboard: init dir', () => {
+  dashDir = makeDashDir();
+  assert(fs.existsSync(dashDir), 'dash dir should exist');
+});
+
+test('Dashboard: smoke test — generates HTML, exits 0', () => {
+  writeSessions(dashDir, { runs: [{
+    id: 'dash-1', task: 'smoke test', status: 'completed',
+    createdAt: '2024-01-01T00:00:00Z',
+    artifactDir: path.join(dashDir, '.moreagent', 'runs', 'dash-1'),
+    sessions: [
+      { id: 'i-1', agentName: 'implementer', status: 'completed', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'dash-1', 'implementer'), startedAt: '2024-01-01T00:00:00Z', runId: 'dash-1' },
+    ],
+  }] });
+  writeArtifactForReport(dashDir, 'dash-1', 'implementer', 'test-report.md', 'Result: PASS\n\nOK');
+
+  const r = runCliIn(dashDir, ['dashboard']);
+  assert(r.status === 0, `dashboard should exit 0, got ${r.status}`);
+  const htmlPath = path.join(dashDir, '.moreagent', 'dashboard', 'index.html');
+  assert(fs.existsSync(htmlPath), `default dashboard HTML should exist at ${htmlPath}`);
+});
+
+test('Dashboard: --output writes to specified path', () => {
+  const outPath = path.join(TMP, 'dash-output', 'custom.html');
+  const r = runCliIn(dashDir, ['dashboard', '--output', outPath]);
+  assert(r.status === 0, `dashboard --output should exit 0, got ${r.status}`);
+  assert(fs.existsSync(outPath), `custom output HTML should exist at ${outPath}`);
+});
+
+test('Dashboard: HTML structure — contains all required sections', () => {
+  writeSessions(dashDir, { runs: [{
+    id: 'dash-struct', task: 'structure test', status: 'completed',
+    createdAt: '2024-01-01T00:00:00Z',
+    artifactDir: path.join(dashDir, '.moreagent', 'runs', 'dash-struct'),
+    sessions: [
+      { id: 's-1', agentName: 'tester', status: 'completed', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'dash-struct', 'tester'), startedAt: '2024-01-01T00:00:00Z', runId: 'dash-struct' },
+    ],
+  }] });
+  writeArtifactForReport(dashDir, 'dash-struct', 'tester', 'test-report.md', 'Result: PASS\n\nOK');
+
+  const r = runCliIn(dashDir, ['dashboard', '--output', path.join(TMP, 'dash-struct.html')]);
+  const html = fs.readFileSync(path.join(TMP, 'dash-struct.html'), 'utf-8');
+  assert(html.includes('Run List') || html.includes('MoreAgent Dashboard'), 'should contain Run List or Dashboard title');
+  assert(html.includes('Workflow Report'), 'should contain Workflow Report');
+  assert(html.includes('Gate'), 'should contain Gate');
+  assert(html.includes('Repair Sessions'), 'should contain Repair Sessions');
+  assert(html.includes('Merge Readiness'), 'should contain Merge Readiness');
+  assert(html.includes('JSON / Debug'), 'should contain JSON / Debug');
+  assert(html.includes('window.__MOREAGENT_DASHBOARD_DATA__'), 'should contain dashboard data');
+});
+
+test('Dashboard: runDetailsById contains latest run', () => {
+  const runId = 'dash-details';
+  writeSessions(dashDir, { runs: [{
+    id: runId, task: 'details test', status: 'completed',
+    createdAt: '2024-01-01T00:00:00Z',
+    artifactDir: path.join(dashDir, '.moreagent', 'runs', runId),
+    sessions: [
+      { id: 'd-1', agentName: 'implementer', status: 'completed', artifactDir: path.join(dashDir, '.moreagent', 'runs', runId, 'implementer'), startedAt: '2024-01-01T00:00:00Z', runId },
+    ],
+  }] });
+
+  const r = runCliIn(dashDir, ['dashboard', '--output', path.join(TMP, 'dash-details.html')]);
+  const html = fs.readFileSync(path.join(TMP, 'dash-details.html'), 'utf-8');
+  const data = extractDashboardData(html);
+  assert(data !== null, 'should extract dashboard data from HTML');
+  assert(data.runDetailsById[runId] !== undefined, `runDetailsById should contain ${runId}`);
+  assert(data.selectedRunId === runId, `selectedRunId should be ${runId}, got ${data.selectedRunId}`);
+});
+
+test('Dashboard: non-full workflow (MVP) does not cause command failure', () => {
+  const runId = 'dash-mvp';
+  writeSessions(dashDir, { runs: [{
+    id: runId, task: 'mvp run', status: 'completed',
+    createdAt: '2024-01-01T00:00:00Z',
+    artifactDir: path.join(dashDir, '.moreagent', 'runs', runId),
+    sessions: [
+      { id: 'm-1', agentName: 'implementer', status: 'completed', artifactDir: path.join(dashDir, '.moreagent', 'runs', runId, 'implementer'), startedAt: '2024-01-01T00:00:00Z', runId },
+    ],
+  }] });
+
+  const r = runCliIn(dashDir, ['dashboard', '--output', path.join(TMP, 'dash-mvp.html')]);
+  assert(r.status === 0, `dashboard with MVP run should exit 0, got ${r.status}`);
+  const html = fs.readFileSync(path.join(TMP, 'dash-mvp.html'), 'utf-8');
+  assert(html.includes('MVP run') || html.includes('workflow unavailable'), 'should show workflow unavailable for MVP run');
+});
+
+test('Dashboard: --limit controls number of embedded runs', () => {
+  writeSessions(dashDir, { runs: [
+    { id: 'limit-1', task: 'run 1', status: 'completed', createdAt: '2024-01-03T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'limit-1'), sessions: [] },
+    { id: 'limit-2', task: 'run 2', status: 'completed', createdAt: '2024-01-02T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'limit-2'), sessions: [] },
+    { id: 'limit-3', task: 'run 3', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'limit-3'), sessions: [] },
+  ] });
+
+  const r = runCliIn(dashDir, ['dashboard', '--limit', '2', '--output', path.join(TMP, 'dash-limit.html')]);
+  const html = fs.readFileSync(path.join(TMP, 'dash-limit.html'), 'utf-8');
+  const data = extractDashboardData(html);
+  assert(data !== null, 'should extract data');
+  assert(data.runs.length === 2, `runs.length should be 2, got ${data.runs.length}`);
+});
+
+test('Dashboard: --run selects specified run', () => {
+  writeSessions(dashDir, { runs: [
+    { id: 'sel-1', task: 'selected run', status: 'completed', createdAt: '2024-01-02T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'sel-1'), sessions: [] },
+    { id: 'sel-2', task: 'other run', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'sel-2'), sessions: [] },
+  ] });
+
+  const r = runCliIn(dashDir, ['dashboard', '--run', 'sel-2', '--output', path.join(TMP, 'dash-sel.html')]);
+  const html = fs.readFileSync(path.join(TMP, 'dash-sel.html'), 'utf-8');
+  const data = extractDashboardData(html);
+  assert(data !== null, 'should extract data');
+  assert(data.selectedRunId === 'sel-2', `selectedRunId should be sel-2, got ${data.selectedRunId}`);
+});
+
+// ============================================================
 // 6. BUILD CHECK
 // ============================================================
 
