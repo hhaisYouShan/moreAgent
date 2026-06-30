@@ -473,7 +473,7 @@ td{padding:6px 8px;border-bottom:1px solid #21262d}
   <div id="run-list"></div>
 </div>
 <div id="main">
-  ${isEmpty ? '<div style="text-align:center;padding:80px 32px"><h2 style="color:#8b949e;font-size:20px">No runs found</h2><p style="color:#6e7681;margin-top:12px;font-size:14px">Run a task first: <code style="background:#21262d;padding:2px 8px;border-radius:4px;font-size:13px">moreagent start --once --task "..."</code></p></div>' : '<div id="main-content"></div>'}
+  <div id="main-content">${isEmpty ? '<div style="text-align:center;padding:80px 32px"><h2 style="color:#8b949e;font-size:20px">No runs found</h2><p style="color:#6e7681;margin-top:12px;font-size:14px">Run a task first: <code style="background:#21262d;padding:2px 8px;border-radius:4px;font-size:13px">moreagent start --once --task "..."</code></p></div>' : ''}</div>
 </div>
 
 <script>
@@ -952,7 +952,8 @@ window.__MOREAGENT_DASHBOARD_RUNTIME__ = ${runtimeJson};
           window.__MOREAGENT_DASHBOARD_DATA__ = data;
           D = data;
           renderSidebar();
-          if (currentRunId && data.runs.length > 0) {
+          if (data.runs.length > 0) {
+            if (!currentRunId) currentRunId = data.selectedRunId || data.runs[0].id;
             var found = data.runs.some(function(x){return x.id===currentRunId;});
             if (!found) currentRunId = data.runs[0].id;
             renderMain();

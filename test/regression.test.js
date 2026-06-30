@@ -1692,12 +1692,27 @@ test('Dashboard: async test infrastructure verification', function() {
 console.log('\n9. Dashboard Serve Usability (V3.1)');
 console.log('===================================');
 
-test('V3.1: serve startup output shows runtime summary', () => {
-  writeSessions(dashDir, { runs: [{ id: 'v31-start', task: 'startup', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'v31-start'), sessions: [] }] });
-  const result = spawnSync('node', [CLI, 'dashboard', '--serve', '--limit', '5', '--port', '14340'], {
-    cwd: dashDir, encoding: 'utf-8', timeout: 15000,
+function captureServeOutput(args, timeoutMs) {
+  return new Promise((resolve) => {
+    const proc = require('child_process').spawn('node', [CLI, ...args], {
+      cwd: dashDir, stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    let out = '';
+    proc.stdout.on('data', (d) => { out += d.toString(); });
+    const t = setTimeout(() => { proc.kill('SIGTERM'); resolve(out); }, timeoutMs || 10000);
+    proc.stdout.on('data', function check() {
+      if (out.includes('Dashboard server started') && out.includes('URL:')) {
+        clearTimeout(t);
+        setTimeout(() => { proc.kill('SIGTERM'); resolve(out); }, 300);
+        proc.stdout.removeListener('data', check);
+      }
+    });
   });
-  const out = result.stdout || '';
+}
+
+test('V3.1: serve startup output shows runtime summary', async function() {
+  writeSessions(dashDir, { runs: [{ id: 'v31-start', task: 'startup', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'v31-start'), sessions: [] }] });
+  const out = await captureServeOutput(['dashboard', '--serve', '--limit', '5', '--port', '14340']);
   assert(out.includes('Dashboard server started'), 'should contain Dashboard server started');
   assert(out.includes('URL:'), 'should contain URL');
   assert(out.includes('Host:'), 'should contain Host');
@@ -1708,22 +1723,16 @@ test('V3.1: serve startup output shows runtime summary', () => {
   assert(out.includes('Limit: 5'), 'should contain Limit: 5');
 });
 
-test('V3.1: serve startup output shows watch enabled', () => {
+test('V3.1: serve startup output shows watch enabled', async function() {
   writeSessions(dashDir, { runs: [{ id: 'v31-watch', task: 'watch test', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'v31-watch'), sessions: [] }] });
-  const result = spawnSync('node', [CLI, 'dashboard', '--serve', '--watch', '--port', '14341'], {
-    cwd: dashDir, encoding: 'utf-8', timeout: 15000,
-  });
-  const out = result.stdout || '';
+  const out = await captureServeOutput(['dashboard', '--serve', '--watch', '--port', '14341']);
   assert(out.includes('Watch: enabled'), 'should contain Watch: enabled');
   assert(out.includes('Refresh interval: 3000ms'), 'should contain Refresh interval: 3000ms');
 });
 
-test('V3.1: serve startup output shows selected run', () => {
+test('V3.1: serve startup output shows selected run', async function() {
   writeSessions(dashDir, { runs: [{ id: 'v31-sel', task: 'selected', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'v31-sel'), sessions: [] }] });
-  const result = spawnSync('node', [CLI, 'dashboard', '--serve', '--run', 'v31-sel', '--port', '14342'], {
-    cwd: dashDir, encoding: 'utf-8', timeout: 15000,
-  });
-  const out = result.stdout || '';
+  const out = await captureServeOutput(['dashboard', '--serve', '--run', 'v31-sel', '--port', '14342']);
   assert(out.includes('Selected run: v31-sel'), 'should contain Selected run: v31-sel');
 });
 

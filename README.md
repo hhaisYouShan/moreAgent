@@ -200,6 +200,21 @@ The serve mode provides three endpoints:
 
 `--serve --watch` enables 3000ms auto-refresh polling of `/data.json` with a manual refresh button.
 
+**Startup output example:**
+
+```
+Dashboard server started
+URL: http://127.0.0.1:4317/
+Host: 127.0.0.1
+Port: 4317
+Watch: disabled
+Refresh interval: manual
+Selected run: latest
+Limit: 10
+```
+
+**Refresh behavior:** The serve page shows a runtime status strip with _Last refreshed_, _Refreshing..._, and _Refresh failed_ states. When auto-refresh fails, the page retains its last successful data and shows _Showing last successful data_. Partial errors (e.g., a single run's detail unavailable) do not count as full refresh failures.
+
 ### Report Quick Start
 
 Show the latest workflow report:
