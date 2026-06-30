@@ -485,6 +485,10 @@ window.__MOREAGENT_DASHBOARD_RUNTIME__ = ${runtimeJson};
   var currentRunId = '${selectedId}';
   var currentFilter = 'all';
 
+  // -- serve mode runtime -- (must init before any early returns)
+  var RT = window.__MOREAGENT_DASHBOARD_RUNTIME__ || {};
+  if (RT.serveMode) { initServeRuntime(); }
+
   if (D.runs.length === 0) {
     renderSidebar();
     return;
@@ -907,7 +911,8 @@ window.__MOREAGENT_DASHBOARD_RUNTIME__ = ${runtimeJson};
   renderMain();
 
   // -- serve mode runtime --
-  var RT = window.__MOREAGENT_DASHBOARD_RUNTIME__ || {};
+  function initServeRuntime() {
+    var RT = window.__MOREAGENT_DASHBOARD_RUNTIME__ || {};
   if (RT.serveMode) {
     var refreshState = { kind: 'idle', lastRefreshedAt: null, isShowingStaleData: false };
     var refreshBtn = document.createElement('div');
@@ -1002,6 +1007,7 @@ window.__MOREAGENT_DASHBOARD_RUNTIME__ = ${runtimeJson};
       statusStrip.innerHTML = html;
     }
   }
+  } // end initServeRuntime
 })();
 </script>
 </body>

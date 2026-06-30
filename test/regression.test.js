@@ -1694,30 +1694,37 @@ console.log('===================================');
 
 test('V3.1: serve startup output shows runtime summary', () => {
   writeSessions(dashDir, { runs: [{ id: 'v31-start', task: 'startup', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'v31-start'), sessions: [] }] });
-  const p = startServer(['dashboard', '--serve', '--limit', '5', '--port', '14340']);
-  return waitForServer(p, 10000).then((url) => {
-    p.kill('SIGTERM');
-    assert(url.includes('14340'), 'URL should use correct port');
-    // stdout check done by waitForServer matching URL: pattern
+  const result = spawnSync('node', [CLI, 'dashboard', '--serve', '--limit', '5', '--port', '14340'], {
+    cwd: dashDir, encoding: 'utf-8', timeout: 15000,
   });
+  const out = result.stdout || '';
+  assert(out.includes('Dashboard server started'), 'should contain Dashboard server started');
+  assert(out.includes('URL:'), 'should contain URL');
+  assert(out.includes('Host:'), 'should contain Host');
+  assert(out.includes('Port:'), 'should contain Port');
+  assert(out.includes('Watch: disabled'), 'should contain Watch: disabled');
+  assert(out.includes('Refresh interval: manual'), 'should contain Refresh interval: manual');
+  assert(out.includes('Selected run: latest'), 'should contain Selected run: latest');
+  assert(out.includes('Limit: 5'), 'should contain Limit: 5');
 });
 
 test('V3.1: serve startup output shows watch enabled', () => {
   writeSessions(dashDir, { runs: [{ id: 'v31-watch', task: 'watch test', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'v31-watch'), sessions: [] }] });
-  const p = startServer(['dashboard', '--serve', '--watch', '--port', '14341']);
-  return waitForServer(p, 10000).then((url) => {
-    p.kill('SIGTERM');
-    assert(url.includes('14341'), 'URL should use correct port');
+  const result = spawnSync('node', [CLI, 'dashboard', '--serve', '--watch', '--port', '14341'], {
+    cwd: dashDir, encoding: 'utf-8', timeout: 15000,
   });
+  const out = result.stdout || '';
+  assert(out.includes('Watch: enabled'), 'should contain Watch: enabled');
+  assert(out.includes('Refresh interval: 3000ms'), 'should contain Refresh interval: 3000ms');
 });
 
 test('V3.1: serve startup output shows selected run', () => {
   writeSessions(dashDir, { runs: [{ id: 'v31-sel', task: 'selected', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'v31-sel'), sessions: [] }] });
-  const p = startServer(['dashboard', '--serve', '--run', 'v31-sel', '--port', '14342']);
-  return waitForServer(p, 10000).then((url) => {
-    p.kill('SIGTERM');
-    assert(url.includes('14342'), 'server should start with selected run');
+  const result = spawnSync('node', [CLI, 'dashboard', '--serve', '--run', 'v31-sel', '--port', '14342'], {
+    cwd: dashDir, encoding: 'utf-8', timeout: 15000,
   });
+  const out = result.stdout || '';
+  assert(out.includes('Selected run: v31-sel'), 'should contain Selected run: v31-sel');
 });
 
 test('V3.1: HTML contains Refresh data button', function() {
@@ -1745,6 +1752,23 @@ test('V3.1: HTML contains runtime status text', function() {
       assert(res.body.includes('Last refreshed'), 'should contain Last refreshed');
       assert(res.body.includes('Refreshing'), 'should contain Refreshing');
       assert(res.body.includes('Refresh failed'), 'should contain Refresh failed');
+      resolve();
+    } catch(e) { reject(e); }
+  });
+});
+
+test('V3.1: no-runs serve page contains Refresh data and runtime status', function() {
+  return new Promise(async (resolve, reject) => {
+    try {
+      writeSessions(dashDir, { runs: [] });
+      const p = startServer(['dashboard', '--serve', '--port', '14348']);
+      const url = await waitForServer(p, 10000);
+      const res = await httpGet(url);
+      p.kill('SIGTERM');
+      assert(res.body.includes('No runs found'), 'should show No runs found');
+      assert(res.body.includes('Refresh data'), 'should have Refresh data button');
+      assert(res.body.includes('runtime-status'), 'should have runtime-status element');
+      assert(res.body.includes('Last refreshed'), 'should have Last refreshed');
       resolve();
     } catch(e) { reject(e); }
   });
