@@ -21,6 +21,10 @@ For current behavior, prefer:
 - [Report Usage](report-usage.md)
 - [Troubleshooting](troubleshooting.md)
 
+## Current Product Docs
+
+- [Current Product Requirements (zh-CN)](product-requirements.current.zh-CN.md)
+
 ## Current Architecture Docs
 
 - [Architecture](architecture.md)

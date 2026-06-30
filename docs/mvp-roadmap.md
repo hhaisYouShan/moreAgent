@@ -2,12 +2,15 @@
 
 ## Current Status
 
-This roadmap reflects the current state through V2.4.
+This roadmap reflects the current state after V3.0 completion and the currently confirmed next-stage route.
 
 Current position:
 
-1. V2.4 completed
-2. V3.0 `dashboard --serve / --watch` pending
+1. V3.0 completed
+2. V3.1 in progress
+3. V3.2 planned
+4. V4.x planned
+5. V5.0 planned
 
 This file is no longer a “pre-init MVP checklist”.
 It is a current-state roadmap.
@@ -86,29 +89,54 @@ Already completed and should not be described as pending anymore:
 6. inspect/status/report command family
 7. manual merge workflow
 
-Still intentionally pending:
+Current planned route:
 
-1. V3.0 `dashboard --serve`
-2. V3.0 `dashboard --serve --watch`
-3. browser-side auto-refresh in serve mode
+1. V3.1 dashboard usability hardening
+2. V3.2 one-click project integration
+3. V4.0 PRD review meeting
+4. V4.1 three-way tech plan review
+5. V4.2 failure attribution and targeted return flow
+6. V5.0 true multi-agent parallel worktree execution
 
 ## Near-Term Roadmap
 
-### V2.4
-
-- [x] Completed
-- [x] User docs and troubleshooting docs aligned
-- [x] Static dashboard flow documented
-
 ### V3.0
 
-- [ ] `dashboard --serve`
-- [ ] `dashboard --serve --open`
-- [ ] `dashboard --serve --watch`
-- [ ] local HTTP dashboard service
-- [ ] browser-side `Refresh data`
-- [ ] polling `/data.json` in watch mode
-- [ ] test-safe server lifecycle and close handle
+- [x] Completed
+- [x] `dashboard --serve`
+- [x] `dashboard --serve --open`
+- [x] `dashboard --serve --watch`
+- [x] local HTTP dashboard service
+- [x] browser-side `Refresh data`
+- [x] polling `/data.json` in watch mode
+- [x] test-safe server lifecycle and close handle
+
+### V3.1
+
+- [ ] dashboard usability hardening
+- [ ] serve/watch startup information hardening
+- [ ] runtime refresh status hardening
+- [ ] no-runs watch handling hardening
+- [ ] docs and regression test sync
+
+### V3.2
+
+- [ ] `moreagent init --full`
+- [ ] full workflow config generation
+- [ ] docs / agents / integration guide generation
+- [ ] one-click existing project integration path
+
+### V4.x
+
+- [ ] V4.0 PRD review meeting
+- [ ] V4.1 three-way tech plan review
+- [ ] V4.2 failure attribution and targeted return flow
+
+### V5.0
+
+- [ ] multi-agent parallel worktree execution
+- [ ] orchestrated parallel development / test / review
+- [ ] unified convergence and observability
 
 ## Non-Goals Of The Current Roadmap
 

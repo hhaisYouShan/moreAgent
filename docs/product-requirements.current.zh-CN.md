@@ -56,7 +56,7 @@ MoreAgent 是一个面向本地代码仓库的多 Agent 开发编排工具，用
 
 ## 4.1 原始 PRD 中已完成的能力
 
-基于 [product-requirements.zh-CN.md](/Users/lihaishan/Desktop/openCodeAI/moreAgent/docs/product-requirements.zh-CN.md)，以下能力已经完成或基本完成：
+基于 [product-requirements.zh-CN.md](product-requirements.zh-CN.md)，以下能力已经完成或基本完成：
 
 ### 初始化与基础设施
 
@@ -339,67 +339,84 @@ brain
 
 主题：
 
-1. serve/watch 模式可用性增强
-2. runtime 状态可观测性增强
-3. `/data.json` 错误展示增强
-4. serve/watch 文档补强
+1. Dashboard usability hardening
+2. serve/watch 启动信息补强
+3. runtime status 与 refresh 状态补强
+4. 文档同步和测试补强
 
 目标：
 
-1. 让本地 dashboard serve/watch 适合长期开着看
-2. 让用户能理解刷新状态、错误状态和旧数据保留逻辑
+1. 完成 serve/watch 的启动信息、runtime status、`Refresh data`、`Last refreshed`、`Refresh failed`、`Showing last successful data`。
+2. 补齐 no-runs watch 场景下的稳定性、文档同步和测试补强。
+3. 让 dashboard serve/watch 从“能运行”提升到“可稳定使用、可观察、可排障”。
 
 ## 9.2 V3.2
 
-建议主题：
+主题：
 
-1. 文档与状态体系对齐
-2. report / dashboard / inspect 之间的术语与状态统一
-3. 验收样本与回归 fixture 标准化
+1. 一键集成项目
+2. `moreagent init --full`
+3. 完整工作流配置与接入说明生成
 
 目标：
 
-1. 降低用户理解成本
-2. 降低后续版本文档与实现漂移
+1. `moreagent init --full` 生成完整工作流配置、docs、agents、项目接入说明。
+2. 让用户可以把 moreAgent 一键接入已有项目，而不是手工补齐配置和文档。
 
 ## 9.3 V4.0
 
-建议主题：
+主题：
 
-1. 多 runtime 能力落地
-2. OpenCode 之外的运行时抽象真正可用
-3. runtime profile 产品化
-
-可能内容：
-
-1. Codex runtime
-2. Claude Code runtime
-3. runtime preflight / capability matrix
-
-## 9.4 V4.5
-
-建议主题：
-
-1. workflow 模板化
-2. agent prompt / workflow profile 产品化
-3. 更明确的 full workflow 配置能力
+1. PRD 评审会议
+2. 多角色需求评审
+3. product 修订与 brain gate 判断
 
 目标：
 
-1. 从“当前内置几种流程”升级为“可管理的流程模板”
+1. frontend / backend / tester review PRD。
+2. product Agent 回答评审问题并修订 PRD。
+3. 总大脑判断 PRD 是否通过，未通过则继续修订。
 
-## 9.5 V5.0
+## 9.4 V4.1
 
-建议主题：
+主题：
 
-1. 项目级 AI 开发控制台
-2. 多项目运行视图
-3. 更完整的任务队列、审计、审批、协作边界
+1. 技术方案三方评审
+2. frontend-plan / backend-plan / test-plan
+3. brain 统一技术评审
 
-注意：
+目标：
 
-1. V5.0 才适合讨论真正的平台化
-2. 当前不建议提前引入远程服务和登录复杂度
+1. 由 frontend / backend / tester 分别产出技术方案。
+2. 总大脑统一评审技术方案，决定通过或退回修改。
+
+## 9.5 V4.2
+
+主题：
+
+1. 失败归因和定向回流
+2. test / review 失败后的 owner 分派
+3. 按角色回修闭环
+
+目标：
+
+1. 测试失败或 review 失败后，总大脑分析归因。
+2. 将问题定向派回 frontend / backend / tester / product 对应角色修复。
+3. 修复后重新进入测试和评审闭环。
+
+## 9.6 V5.0
+
+主题：
+
+1. 真正多 Agent 并行 worktree 执行
+2. 并行开发、测试、review
+3. 总大脑统一调度和收敛
+
+目标：
+
+1. 多个 Agent 在独立 worktree 中并行开发、测试、review。
+2. 由总大脑统一调度并行执行结果并完成收敛。
+3. 保持 session、artifact、workflow 的统一可观测性。
 
 ## 十、原始 PRD 与后续版本验收标准
 
@@ -424,17 +441,35 @@ brain
 5. selected run persist 不回退
 6. static dashboard / `--open` 不回退
 
-## 10.3 V4.0 验收标准
+## 10.3 V3.2 验收标准
 
-1. 至少一个非 OpenCode runtime 真正可运行
-2. runtime profile 行为稳定
-3. 不破坏当前 artifact / report / dashboard 语义
+1. `moreagent init --full` 能生成完整工作流所需的 config、docs、agents、目录结构
+2. 初始化结果包含项目接入说明，而不是只生成空骨架
+3. 用户能在已有仓库中按生成结果完成 moreAgent 接入
 
-## 10.4 V5.0 验收标准
+## 10.4 V4.0 验收标准
 
-1. 多项目管理有真实产品价值
-2. 任务与 run 的跨项目视图清晰
-3. 平台化不破坏本地 CLI-first 使用路径
+1. PRD 阶段存在 frontend / backend / tester 三个评审角色输出
+2. product Agent 能回答问题并修订 PRD
+3. 总大脑能判断 PRD 是否通过，并支持未通过时继续修订
+
+## 10.5 V4.1 验收标准
+
+1. `frontend-plan`、`backend-plan`、`test-plan` 三类方案产物能够稳定生成
+2. 总大脑能对三方技术方案统一评审并输出 gate 结论
+3. 技术方案未通过时，能够回退到对应方案修订阶段
+
+## 10.6 V4.2 验收标准
+
+1. tester 或 reviewer 失败后，会生成明确的失败归因结果
+2. 归因结果能够把修复任务定向派回 frontend / backend / tester / product 对应角色
+3. 定向修复后，流程能重新回到 test / review 并继续收敛
+
+## 10.7 V5.0 验收标准
+
+1. 多个 Agent 能在独立 worktree 中并行执行，而不是共享单一任务 worktree
+2. 总大脑能统一调度并行执行结果，并完成测试、评审与阶段收敛
+3. 并行 worktree 的 session、artifact、status、report、dashboard 仍能保持统一可观测性
 
 ## 十一、当前版本结论
 
@@ -450,4 +485,4 @@ brain
 
 1. 把现有 V3.x 使用体验做扎实
 2. 把 runtime、workflow、artifact、dashboard 语义统一
-3. 为后续 V4.x 的多 runtime 和模板化打基础
+3. 为后续 V4.x 的多角色评审、归因回流和并行执行打基础
