@@ -353,6 +353,9 @@ See:
 - [dashboard-usage.md](docs/dashboard-usage.md)
 - [report-usage.md](docs/report-usage.md)
 - [troubleshooting.md](docs/troubleshooting.md)
+- [docs index](docs/index.md)
+- [architecture](docs/architecture.md)
+- [roadmap](docs/mvp-roadmap.md)
 
 ### Artifact Decision Markers
 
