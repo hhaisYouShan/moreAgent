@@ -534,7 +534,8 @@ test('Report: completed + PASS/APPROVED + clean → MERGE_READY', () => {
   writeSessions(reportDir, { runs: [{ id: runId, task: 'good run', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId), sessions }] });
   const r = runCliIn(reportDir, ['report', '--run', runId, '--json']);
   const data = JSON.parse(r.stdout);
-  assert(data.report.decision.overallStatus === 'PASSED', `got ${data.report.decision.overallStatus}`);
+  assert(data.report.decision.overallStatus === 'PASSED',
+    `got ${data.report.decision.overallStatus}, gates: test=${data.report.quality.test} review=${data.report.quality.review}`);
   // recommendation depends on worktree/main state; just check it's one of the valid values
   assert(['MERGE_READY', 'BLOCKED', 'NEEDS_REPAIR', 'NEEDS_REVIEW', 'RUNNING', 'UNKNOWN'].includes(data.report.decision.recommendation),
     `invalid recommendation: ${data.report.decision.recommendation}`);

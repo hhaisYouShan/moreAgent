@@ -104,18 +104,21 @@ function computeDecision(
   worktree: ReturnType<typeof getWorktreeInfo>,
   mainClean: boolean,
 ): ReportModel['report']['decision'] {
+  const isFull = run.workflow?.profile === 'full' ||
+    run.sessions.some((s) => s.agentName.startsWith('brain'));
+
   const explicitFailure =
     run.status === 'failed' ||
     gates.test === 'FAIL' ||
     gates.review === 'CHANGES_REQUESTED' ||
-    gates.prdGate === 'CHANGES_REQUESTED' ||
-    gates.techGate === 'CHANGES_REQUESTED';
+    (isFull && gates.prdGate === 'CHANGES_REQUESTED') ||
+    (isFull && gates.techGate === 'CHANGES_REQUESTED');
 
   const anyUnknown =
     gates.test === 'unknown' ||
     gates.review === 'unknown' ||
-    gates.prdGate === 'unknown' ||
-    gates.techGate === 'unknown';
+    (isFull && gates.prdGate === 'unknown') ||
+    (isFull && gates.techGate === 'unknown');
 
   let overallStatus: string;
   if (run.status === 'running') {
@@ -128,8 +131,8 @@ function computeDecision(
     run.status === 'completed' &&
     gates.test === 'PASS' &&
     gates.review === 'APPROVED' &&
-    gates.prdGate === 'APPROVED' &&
-    gates.techGate === 'APPROVED'
+    (!isFull || gates.prdGate === 'APPROVED') &&
+    (!isFull || gates.techGate === 'APPROVED')
   ) {
     overallStatus = 'PASSED';
   } else {
