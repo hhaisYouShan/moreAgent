@@ -542,13 +542,19 @@ test('Report: MERGE_READY (PASS/APPROVED + real worktree)', () => {
     { id: 't-1', agentName: 'tester', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'tester'), startedAt: '2024-01-01T00:00:00Z', completedAt: '2024-01-01T00:00:30Z', runId },
     { id: 'r-1', agentName: 'reviewer', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'reviewer'), startedAt: '2024-01-01T00:00:00Z', completedAt: '2024-01-01T00:00:30Z', worktreePath: reportWtPath, runId },
   ] }] });
+
+  execSync('git add -A && git commit -m "merge-ready test data"', { cwd: reportDir, stdio: 'pipe' });
+
+  const st = execSync('git status --porcelain', { cwd: reportDir, encoding: 'utf-8' }).trim();
+  assert(st === '', `main should be clean before MERGE_READY report, got ${st}`);
+
   const r = runCliIn(reportDir, ['report', '--run', runId, '--json']);
   const data = JSON.parse(r.stdout);
   assert(data.report.decision.overallStatus === 'PASSED', `got ${data.report.decision.overallStatus}`);
+  assert(data.report.decision.recommendation === 'MERGE_READY', `got ${data.report.decision.recommendation}`);
   assert(data.report.merge.canMerge === true, 'canMerge should be true');
+  assert(data.report.merge.mainClean === true, 'mainClean should be true');
   assert(data.report.worktree.exists === true, 'worktree should exist');
-  assert(['MERGE_READY', 'BLOCKED'].includes(data.report.decision.recommendation),
-    `recommendation should be MERGE_READY or BLOCKED, got ${data.report.decision.recommendation}`);
 });
 
 test('Report: BLOCKED (PASS/APPROVED + real worktree + main dirty)', () => {

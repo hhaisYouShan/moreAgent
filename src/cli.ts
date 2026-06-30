@@ -80,6 +80,9 @@ Examples:
   moreagent diff --run run-2026-06-29T12-00-00-abc123
   moreagent inspect
   moreagent inspect --agent reviewer
+  moreagent report --latest
+  moreagent report --run run-2026-06-29T12-00-00-abc123
+  moreagent report --latest --json
   moreagent clean --runs
   moreagent clean --worktrees
   moreagent clean --all
