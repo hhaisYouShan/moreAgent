@@ -47,36 +47,146 @@ moreagent dashboard
 
 ### What you see
 
-- `Run not found in prefetched range`
+- `Run not found: <id>`
 
 ### Why it happens
 
-1. You used `--run`
-2. But that run is not included in the latest prefetched runs
-3. Your `--limit` is too small
+1. You used `--run` with a run ID that does not exist in the run history
+2. The run ID prefix does not match any known run
+
+Note: in V3.0+, if the run exists but falls outside the `--limit` range, it is **still included** automatically. This error only appears when the run truly does not exist.
 
 ### What to do
 
-Increase the prefetched range:
+Verify the run exists:
 
 ```bash
-moreagent dashboard --run run-2026-06-29T12-00-00-abc123 --limit 20
-```
-
-Or inspect the run from CLI first:
-
-```bash
-moreagent status --run run-2026-06-29T12-00-00-abc123
+moreagent status
+moreagent status --run <id>
 ```
 
 ### Related commands
 
 ```bash
-moreagent dashboard --run <id> --limit <n>
+moreagent dashboard --run <id>
 moreagent status --run <id>
 ```
 
-## Open failed
+## Port conflict (serve mode)
+
+### What you see
+
+- `Port <n> is already in use.`
+- Server fails to start
+
+### Why it happens
+
+Another process is already listening on the requested port.
+
+### What to do
+
+Use a different port:
+
+```bash
+moreagent dashboard --serve --port 4318
+```
+
+Or find and stop the process using the port:
+
+```bash
+lsof -i :4317
+```
+
+### Related commands
+
+```bash
+moreagent dashboard --serve --port <n>
+```
+
+## --watch requires --serve
+
+### What you see
+
+- `Error: --watch requires --serve`
+
+### Why it happens
+
+`--watch` is only meaningful in serve mode. Using it without `--serve` is rejected.
+
+### What to do
+
+Add `--serve`:
+
+```bash
+moreagent dashboard --serve --watch
+```
+
+## Serve open failed
+
+### What you see
+
+- `Open failed: ...` in serve mode
+- Server continues running
+
+### Why it happens
+
+The server started successfully, but the browser could not be opened automatically. The server is unaffected.
+
+### What to do
+
+Open the printed URL manually:
+
+```bash
+# Example URL from server output
+open http://127.0.0.1:4317/
+```
+
+### Related commands
+
+```bash
+moreagent dashboard --serve --open
+```
+
+## /data.json refresh failed
+
+### What you see
+
+- In watch mode, the refresh status shows an error
+- Previous dashboard data remains visible
+
+### Why it happens
+
+The `/data.json` endpoint returned an error for a poll request. Possible causes:
+
+1. `status --json` failed temporarily
+2. Session data is corrupt or incomplete
+3. The project directory state changed mid-refresh
+
+### What to do
+
+The dashboard retains the last successful data. Check the error directly:
+
+```bash
+curl http://127.0.0.1:4317/data.json
+```
+
+Or run the CLI commands to diagnose:
+
+```bash
+moreagent status --json
+moreagent status --run <id> --json
+```
+
+The next poll cycle will retry automatically. If the error persists, restart the server.
+
+### Related commands
+
+```bash
+moreagent dashboard --serve --watch
+moreagent status --json
+```
+
+## Open failed (static mode)
 
 ### What you see
 

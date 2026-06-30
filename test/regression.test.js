@@ -28,33 +28,18 @@ const failures = [];
 let lastAsyncPromise = Promise.resolve();
 
 function test(name, fn) {
-  // AsyncFunction check: these must run serially, never call fn() until chain is ready
-  if (fn.constructor.name === 'AsyncFunction') {
-    lastAsyncPromise = lastAsyncPromise.then(() => fn()).then(
-      () => { passed++; console.log(`  ✅ ${name}`); },
-      (e) => { failed++; const msg = e && e.message ? e.message : String(e); failures.push({ name, error: msg }); console.log(`  ❌ ${name}: ${msg}`); }
-    );
-    return;
-  }
-
-  // Non-async function. Call once for detection and execution.
-  try {
-    const result = fn();
-    if (result && typeof result.then === 'function') {
-      // Regular function returning a Promise — chain it
-      lastAsyncPromise = lastAsyncPromise.then(() => result).then(
-        () => { passed++; console.log(`  ✅ ${name}`); },
-        (e) => { failed++; const msg = e && e.message ? e.message : String(e); failures.push({ name, error: msg }); console.log(`  ❌ ${name}: ${msg}`); }
-      );
-      return;
+  lastAsyncPromise = lastAsyncPromise.then(async () => {
+    try {
+      await fn();
+      passed++;
+      console.log(`  ✅ ${name}`);
+    } catch (e) {
+      failed++;
+      const msg = e && e.message ? e.message : String(e);
+      failures.push({ name, error: msg });
+      console.log(`  ❌ ${name}: ${msg}`);
     }
-    passed++;
-    console.log(`  ✅ ${name}`);
-  } catch (e) {
-    failed++;
-    failures.push({ name, error: e.message });
-    console.log(`  ❌ ${name}: ${e.message}`);
-  }
+  });
 }
 
 function assert(cond, msg) {
@@ -1535,7 +1520,7 @@ test('Dashboard: --limit 2 via serve limits runs count', function() {
       const url = await waitForServer(p, 10000);
       const res = await httpGet(url + 'data.json');
       const data = JSON.parse(res.body);
-      assert(data.runs.length <= 10);
+      assert(data.runs.length === 2, `--limit 2 should have exactly 2 runs, got ${data.runs.length}`);
       p.kill('SIGTERM');
       resolve();
     } catch(e) { reject(e); }
@@ -1549,7 +1534,10 @@ test('Dashboard: no runs returns empty serve dashboard', function() {
       const p = startServer(['dashboard', '--serve', '--port', '14327']);
       const url = await waitForServer(p, 10000);
       const res = await httpGet(url);
-      assert(res.body.includes('No runs found') || res.body.includes('MoreAgent Dashboard'), `expected dashboard HTML, got: ${res.body.slice(0,100)}`);
+      assert(res.body.includes('No runs found'), 'HTML should contain No runs found');
+      const dj = await httpGet(url + 'data.json');
+      const data = JSON.parse(dj.body);
+      assert(data.runs.length === 0, '/data.json runs should be empty');
       p.kill('SIGTERM');
       resolve();
     } catch(e) { reject(e); }
@@ -1641,7 +1629,11 @@ test('Dashboard: --port 1.5 exits non-zero', () => {
 test('Dashboard: --serve --run old-run --limit 1 includes selected run', function() {
   return new Promise(async (resolve, reject) => {
     try {
-      const freshDir = makeDashDir();
+      const freshDir = path.join(TMP, 'persist-test');
+      try { fs.rmSync(freshDir, { recursive: true }); } catch {}
+      fs.mkdirSync(freshDir, { recursive: true });
+      require('child_process').execSync('git init', { cwd: freshDir, stdio: 'pipe' });
+      spawnSync('node', [CLI, 'init'], { cwd: freshDir, encoding: 'utf-8' });
       writeSessions(freshDir, { runs: [
     { id: 'persist-1', task: 'latest', status: 'completed', createdAt: '2024-01-03T00:00:00Z', artifactDir: path.join(freshDir, '.moreagent', 'runs', 'persist-1'), sessions: [] },
     { id: 'persist-2', task: 'middle', status: 'completed', createdAt: '2024-01-02T00:00:00Z', artifactDir: path.join(freshDir, '.moreagent', 'runs', 'persist-2'), sessions: [] },

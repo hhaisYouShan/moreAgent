@@ -2,324 +2,174 @@
 
 ## Overview
 
-`moreagent dashboard` generates a static HTML dashboard for local inspection.
+`moreagent dashboard` provides two modes:
 
-It is designed for:
+1. **Static HTML** (default): generates a single HTML file for local inspection
+2. **Serve mode** (`--serve`): starts a local HTTP server with live data
 
-1. Reviewing recent runs visually
-2. Switching between runs from a sidebar
-3. Reading workflow, gate, repair, merge readiness, and session information
-4. Inspecting raw JSON/debug data when needed
+Both modes are designed for read-only inspection. They do not execute merge / resume / start actions.
 
-It does **not**:
+## Static Mode (Default)
 
-1. Start a server
-2. Watch files
-3. Auto-refresh
-4. Execute merge / resume / start actions
-
-## Basic Commands
-
-## Generate dashboard
+### Generate dashboard
 
 ```bash
 moreagent dashboard
 ```
 
-Default output:
+Default output: `.moreagent/dashboard/index.html`
 
-```text
-.moreagent/dashboard/index.html
-```
-
-## Generate and open in the default browser
+### Generate and open in the default browser
 
 ```bash
 moreagent dashboard --open
 ```
 
-Behavior:
-
-1. Generate HTML first
-2. Then try to open that HTML file in the system default browser
-
 If open fails, the HTML file is still generated.
 
-## Select a specific run
+### Select a specific run
 
 ```bash
 moreagent dashboard --run run-2026-06-29T12-00-00-abc123
 ```
 
-This does not generate a single-run-only page.
-It still builds a dashboard with recent runs, but preselects the requested run.
+The selected run is always included in the dashboard, even if it falls outside the latest runs prefetch range. (Previously, runs outside the limit range would cause a failure — now they are forcibly appended.)
 
-## Limit prefetched runs
+### Limit prefetched runs
 
 ```bash
 moreagent dashboard --limit 10
 ```
 
-This controls how many recent runs are embedded into the static HTML.
+Controls how many recent runs are embedded into the HTML. If `--run` specifies a run outside this range, it is still included.
 
-Important:
-
-- Sidebar switching only works within the prefetched range.
-- If `--run` points to a run outside the prefetched range, dashboard generation fails.
-
-## Write to a custom output path
+### Custom output path
 
 ```bash
 moreagent dashboard --output /tmp/moreagent-dashboard.html
 ```
 
-Use this when you want to:
+## Serve Mode (`--serve`)
 
-1. Save the dashboard outside the project directory
-2. Share or archive a single HTML file
-3. Pair with `--open`
+Start a local HTTP server for live dashboard access:
+
+```bash
+moreagent dashboard --serve
+moreagent dashboard --serve --watch
+moreagent dashboard --serve --open
+moreagent dashboard --serve --port 9000
+moreagent dashboard --serve --host localhost
+```
+
+Defaults: host `127.0.0.1`, port `4317`.
+
+### Endpoints
+
+| Route | Description |
+|-------|-------------|
+| `GET /` | Dynamic dashboard HTML (rebuilt per request) |
+| `GET /data.json` | Dashboard model JSON |
+| `GET /health` | Server health check |
+| Other | `404 Not found` |
+
+### Auto-refresh (`--watch`)
+
+```bash
+moreagent dashboard --serve --watch
+```
+
+Enables 3000ms polling of `/data.json`. The page shows a "Refresh data" button in serve mode regardless — `--watch` adds automatic polling.
+
+Requires `--serve`. Using `--watch` alone exits non-zero.
+
+### `--host` and `--port`
+
+```bash
+moreagent dashboard --serve --host 127.0.0.1 --port 4317
+```
+
+- `--host` only accepts `127.0.0.1` or `localhost` (loopback only for security)
+- `--port` must be a positive integer (1–65535), default `4317`
+- Non-loopback hosts and invalid ports exit non-zero
+
+### `--serve --open`
+
+Opens `http://host:port/` in the default browser after the server starts. If open fails, the server continues running.
+
+### `--output` in serve mode
+
+`--output` only applies to static generation. When used with `--serve`, it is ignored and a message is printed.
 
 ## Parameter Combinations
 
-## `--run + --open`
-
 ```bash
-moreagent dashboard --run run-2026-06-29T12-00-00-abc123 --open
+# All flags composable
+moreagent dashboard --run <id> --limit 5 --output /tmp/dash.html --open
+moreagent dashboard --serve --watch --port 9000 --open
+moreagent dashboard --serve --run <id> --limit 5 --open
 ```
 
-Meaning:
+## `--run` + `--limit` in serve mode
 
-1. Generate dashboard
-2. Preselect the given run
-3. Open the generated HTML
+When `--run` selects a run outside the latest `--limit` range:
 
-## `--limit + --open`
-
-```bash
-moreagent dashboard --limit 5 --open
-```
-
-Meaning:
-
-1. Embed the latest 5 runs
-2. Open the generated dashboard
-
-## `--output + --open`
-
-```bash
-moreagent dashboard --output /tmp/dash.html --open
-```
-
-Meaning:
-
-1. Write `/tmp/dash.html`
-2. Open `/tmp/dash.html`
-
-## Full example
-
-```bash
-moreagent dashboard \
-  --run run-2026-06-29T12-00-00-abc123 \
-  --limit 5 \
-  --output /tmp/moreagent-dash.html \
-  --open
-```
+- The selected run is **always included** in the dashboard model
+- `selectedRunId` persists across `/data.json` refreshes
+- The run appears alongside the latest N runs (slightly exceeding the limit)
 
 ## Dashboard Page Areas
 
-## 1. Run List
+### 1. Run List
 
-The sidebar shows recent prefetched runs.
+The sidebar shows recent prefetched runs with:
 
-Typical fields:
+- run id, task summary, status, recommendation, profile, createdAt
 
-1. run id
-2. task summary
-3. status
-4. recommendation
-5. profile
-6. createdAt short time
+Visual markers:
 
-Use it to:
+- **Red** left border: failed / NEEDS_REPAIR
+- **Yellow** left border: running
+- **Green** left border: MERGE_READY
 
-1. Spot failed runs quickly
-2. Spot running runs quickly
-3. Spot merge-ready runs quickly
-4. Switch the detail view locally without re-running CLI
+### 2. Enhanced Summary
 
-## 2. Enhanced Summary
+Top-level conclusion area for the selected run:
 
-This is the top-level conclusion area for the selected run.
+overallStatus, recommendation, canResume, canMerge, mainClean, worktree exists
 
-Typical fields:
+### 3. Workflow Progress
 
-1. run id
-2. task
-3. status
-4. overallStatus
-5. recommendation
-6. canResume
-7. canMerge
-8. mainClean
-9. worktree exists
+Full workflow runs show 9 fixed phases (brain through review). States: completed (green), failed (red), pending (grey).
 
-Use it when you want the shortest possible answer to:
+MVP runs show "workflow unavailable — MVP run" instead.
 
-1. Did this run pass?
-2. Is it merge ready?
-3. Is it blocked?
-4. Can it be resumed?
+### 4. Gate / Test / Review
 
-## 3. Workflow Progress
+PRD Gate, Tech Gate, Test, Review — with unified color coding (green = APPROVED/PASS, red = CHANGES_REQUESTED/FAIL, neutral = unknown).
 
-For full workflow runs, this area shows the workflow phases.
+### 5. Merge Readiness
 
-Typical phases:
+Explains why a run is MERGE_READY or BLOCKED, including canMerge, mainClean, worktree status, and blockedReason.
 
-1. brain
-2. prd
-3. prd-review
-4. prd-gate
-5. tech-plan
-6. tech-gate
-7. implementation
-8. test
-9. review
+### 6. Repair Sessions
 
-States:
+hasRepair, repairCount, repairRounds, and per-session repair details.
 
-1. completed
-2. failed
-3. pending
+### 7. Sessions
 
-For MVP runs, this area degrades intentionally instead of showing a workflow bar.
+Per-session table: agentName, status, duration, artifactDir, worktreePath.
 
-## 4. Gate / Test / Review
+### 8. JSON / Debug
 
-This section summarizes the key decision markers:
-
-1. PRD Gate
-2. Tech Gate
-3. Test
-4. Review
-
-Common values:
-
-1. `APPROVED`
-2. `CHANGES_REQUESTED`
-3. `PASS`
-4. `FAIL`
-5. `unknown`
-
-Use this section when you want to quickly see whether:
-
-1. planning gates passed
-2. tests passed
-3. review approved the output
-
-## 5. Merge Readiness
-
-This section explains whether the run is actually ready to merge.
-
-Typical fields:
-
-1. recommendation
-2. canMerge
-3. mainClean
-4. worktree exists
-5. blockedReason
-6. worktree path
-7. dirty file list
-
-Interpretation:
-
-- `MERGE_READY`
-  - Passed and mergeable
-- `BLOCKED`
-  - Passed, but not mergeable yet
-
-## 6. Repair Sessions
-
-This section helps you understand whether a run entered the repair loop.
-
-Typical fields:
-
-1. hasRepair
-2. repairCount
-3. repairRounds
-4. repair sessions
-5. last failed session
-
-Use it to answer:
-
-1. Did the run need repair?
-2. How many rounds did it take?
-3. Which role last failed?
-
-## 7. Sessions
-
-The sessions table shows per-session execution details.
-
-Typical fields:
-
-1. agentName
-2. status
-3. startedAt
-4. completedAt
-5. duration
-6. artifactDir
-7. runtimeSessionId
-
-This is the best place to inspect execution history at a lower level.
-
-## 8. JSON / Debug
-
-This section is for debugging, not for first-pass reading.
-
-It usually contains:
-
-1. status JSON
-2. report JSON
-3. workflow JSON
-4. per-run error details
-
-Use it when:
-
-1. UI and raw data seem inconsistent
-2. a detail block says unavailable
-3. you need exact error code / message
+Default collapsed. Expand to inspect raw status/report/workflow JSON with error details.
 
 ## MVP Run Degradation
 
-For MVP runs, Dashboard intentionally shows:
-
-- `workflow unavailable`
-- `MVP run — workflow not available`
-
-This is expected behavior.
-
-It does **not** mean:
-
-1. the run failed
-2. dashboard is broken
-3. workflow parsing crashed
-
-It only means the run does not have full workflow phase data.
+MVP runs show "workflow unavailable — MVP run." This is expected — the run simply lacks full workflow phase data. It is not an error.
 
 ## Empty Dashboard
 
-If there are no runs, dashboard should render an empty state.
-
-Typical message:
-
-- `No runs found`
-
-This usually means:
-
-1. you have not run any tasks yet
-2. `.moreagent/sessions.json` has no run history
-
-Suggested next step:
+"No runs found" appears when there are no runs. Run a task first:
 
 ```bash
 moreagent start --once --task "your task"
@@ -327,34 +177,13 @@ moreagent start --once --task "your task"
 
 ## Open Failed
 
-If you use:
-
-```bash
-moreagent dashboard --open
-```
-
-and the browser cannot be opened automatically, you should still see that the HTML was generated.
-
-Typical meaning:
-
-1. output file exists
-2. browser open step failed
-
-Check the printed path and open the file manually.
+If `--open` fails, the HTML file or server is still operational. Check the printed path/URL and access manually.
 
 ## Related Commands
-
-Get a CLI report for one run:
 
 ```bash
 moreagent report --latest
 moreagent report --run run-2026-06-29T12-00-00-abc123
-```
-
-Get raw structured data:
-
-```bash
 moreagent status --json
-moreagent report --latest --json
 moreagent inspect --run run-2026-06-29T12-00-00-abc123 --workflow --json
 ```
