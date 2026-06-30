@@ -204,6 +204,13 @@ export function initCommand(profile: InitProfile = 'mvp', options?: InitOptions)
   const modeLabel = isFull ? 'full' : 'mvp';
   const bootstrapLabel = (options?.fullBootstrap && isFull) ? ' (full-bootstrap)' : '';
 
+  const configPath = path.join(dir, 'config.yaml');
+  const existingConfig = fs.existsSync(configPath);
+  const existingIsFull = existingConfig && fs.readFileSync(configPath, 'utf-8').includes('name: brain');
+
+  // Block full additions if existing config is MVP (not full)
+  const blockFullAdditions = isFull && existingConfig && !existingIsFull;
+
   console.log(`Initializing MoreAgent project (profile: ${modeLabel}${bootstrapLabel})...\n`);
 
   const created: string[] = [];
@@ -224,31 +231,27 @@ export function initCommand(profile: InitProfile = 'mvp', options?: InitOptions)
   ensureDir(path.join(dir, 'worktrees'));
 
   // Config
-  ensureFile(path.join(dir, 'config.yaml'), isFull ? FULL_CONFIG : MVP_CONFIG);
+  ensureFile(configPath, isFull ? FULL_CONFIG : MVP_CONFIG);
 
-  // State files
+  // State files (always safe to create/ensure)
   ensureFile(path.join(dir, 'sessions.json'), JSON.stringify({ runs: [] }, null, 2));
-
   ensureFile(path.join(dir, 'tasks.json'), JSON.stringify({ tasks: [] }, null, 2));
   ensureFile(path.join(dir, 'runtime-sessions.json'), JSON.stringify({ provider: 'opencode', agents: {} }, null, 2));
 
-  // Agents
+  // Agents — block full agents if existing config is not full
   const agentsDir = getOpenCodeAgentsDir();
   ensureDir(agentsDir);
-  const agents = isFull ? FULL_OPENCODE_AGENTS : MVP_OPENCODE_AGENTS;
-  for (const [name, content] of Object.entries(agents)) {
-    ensureFile(path.join(agentsDir, `${name}.md`), content);
-  }
+  if (blockFullAdditions) {
+    console.log('\n⚠  Config already exists and is not a full workflow config.');
+    console.log('   Full agents and integration guide skipped — manual migration required.');
+  } else {
+    const agents = isFull ? FULL_OPENCODE_AGENTS : MVP_OPENCODE_AGENTS;
+    for (const [name, content] of Object.entries(agents)) {
+      ensureFile(path.join(agentsDir, `${name}.md`), content);
+    }
 
-  // Integration guide (full only) — skip if existing config is not full
-  if (isFull && options?.fullBootstrap) {
-    const configPath = path.join(dir, 'config.yaml');
-    const existingConfig = fs.existsSync(configPath);
-    const configIsFull = existingConfig && fs.readFileSync(configPath, 'utf-8').includes('name: brain');
-    if (existingConfig && !configIsFull) {
-      console.log('\n⚠  Config already exists and is not a full workflow config.');
-      console.log('   Full integration guide skipped — manual migration required.');
-    } else {
+    // Integration guide (full only)
+    if (isFull && options?.fullBootstrap) {
       ensureFile(path.join(dir, 'integration-guide.md'), buildIntegrationGuide());
     }
   }
@@ -264,8 +267,8 @@ export function initCommand(profile: InitProfile = 'mvp', options?: InitOptions)
   }
 
   console.log('\nNext:');
-  console.log('  1. Review ' + path.join(dir, 'config.yaml'));
-  if (isFull) {
+  console.log('  1. Review ' + configPath);
+  if (isFull && !blockFullAdditions) {
     console.log('  2. Review ' + path.join(dir, 'integration-guide.md'));
     console.log('  3. Run: moreagent start --once --task "..."');
   } else {

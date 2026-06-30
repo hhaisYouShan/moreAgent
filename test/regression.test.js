@@ -1977,15 +1977,31 @@ test('init: MVP then --full skips integration guide with warning', () => {
   const config = fs.readFileSync(path.join(dir, '.moreagent', 'config.yaml'), 'utf-8');
   assert(config.includes('architect'), 'MVP config should still contain architect');
   assert(!config.includes('name: brain'), 'MVP config should NOT contain brain');
-  // No misleading full integration guide
-  const guidePath = path.join(dir, '.moreagent', 'integration-guide.md');
-  if (fs.existsSync(guidePath)) {
-    const guide = fs.readFileSync(guidePath, 'utf-8');
-    assert(!guide.includes('profile = full') || guide.includes('config was not overwritten'), 'guide should warn about mixed state');
-  }
-  // Should have warning in output
+  // Must NOT create full agents
+  assert(!fs.existsSync(path.join(dir, '.opencode', 'agents', 'brain.md')), 'should not create brain');
+  assert(!fs.existsSync(path.join(dir, '.opencode', 'agents', 'product.md')), 'should not create product');
+  // Must NOT create integration guide
+  assert(!fs.existsSync(path.join(dir, '.moreagent', 'integration-guide.md')), 'should not create integration guide');
+  // Output must include warning
   const out = r.stdout + (r.stderr || '');
-  assert(out.includes('skipped') || out.includes('Config already exists') || out.includes('manual migration'), `should warn, got: ${out.slice(0,300)}`);
+  assert(out.includes('manual migration required'), `should warn about manual migration, got: ${out.slice(0,500)}`);
+  // Next must NOT mention integration-guide.md
+  assert(!out.includes('integration-guide.md'), 'Next should not mention integration-guide.md');
+});
+
+test('init: full config missing agents and guide fills them in', () => {
+  const dir = freshGitDir('v32-full-fill');
+  // First: init --full creates everything
+  runCliIn(dir, ['init', '--full']);
+  // Remove brain agent and guide
+  fs.unlinkSync(path.join(dir, '.opencode', 'agents', 'brain.md'));
+  fs.unlinkSync(path.join(dir, '.moreagent', 'integration-guide.md'));
+  // Re-run init --full
+  const r = runCliIn(dir, ['init', '--full']);
+  assert(r.status === 0, 'should exit 0');
+  // Full agents and guide should be recreated (existing config IS full config)
+  assert(fs.existsSync(path.join(dir, '.opencode', 'agents', 'brain.md')), 'brain agent should be recreated');
+  assert(fs.existsSync(path.join(dir, '.moreagent', 'integration-guide.md')), 'integration guide should be recreated');
 });
 
 test('init: existing config but missing tasks/runtime fills in', () => {
