@@ -84,18 +84,40 @@ function startServeMode(options: DashboardOptions): void {
     process.exit(1);
   }
 
-  const runtimeConfig = {
-    serveMode: true,
-    watchEnabled: options.watch === true,
-    dataEndpoint: `/data.json${options.run ? '?run=' + encodeURIComponent(options.run) : ''}${options.limit ? (options.run ? '&' : '?') + 'limit=' + options.limit : ''}`,
-    refreshIntervalMs: 3000,
-  };
+  const handle = startDashboardServer({
+    run: options.run,
+    limit,
+    watch: options.watch === true,
+    host,
+    port,
+    open: options.open === true,
+  });
+
+  process.on('SIGINT', () => {
+    handle.close();
+  });
+  process.on('SIGTERM', () => {
+    handle.close();
+  });
+}
+
+interface ServerHandle {
+  url: string;
+  host: string;
+  port: number;
+  close: () => void;
+}
+
+function startDashboardServer(opts: {
+  run?: string; limit: number; watch: boolean; host: string; port: number; open: boolean;
+}): ServerHandle {
+  const dataEndpoint = `/data.json${opts.run ? '?run=' + encodeURIComponent(opts.run) : ''}${opts.limit !== DEFAULT_LIMIT ? (opts.run ? '&' : '?') + 'limit=' + opts.limit : ''}`;
 
   const server = http.createServer((req, res) => {
     const url = (req.url || '/').split('?')[0];
 
     if (url === '/') {
-      const model = buildDashboardModel(options.run, limit);
+      const model = buildDashboardModel(opts.run, opts.limit);
       if (!model) {
         res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end('<h1>Failed to build dashboard</h1>');
@@ -103,8 +125,8 @@ function startServeMode(options: DashboardOptions): void {
       }
       const html = renderDashboardHtml(model, {
         serveMode: true,
-        watchEnabled: options.watch === true,
-        dataEndpoint: runtimeConfig.dataEndpoint,
+        watchEnabled: opts.watch,
+        dataEndpoint,
         refreshIntervalMs: 3000,
       });
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -113,7 +135,7 @@ function startServeMode(options: DashboardOptions): void {
     }
 
     if (url === '/data.json') {
-      const model = buildDashboardModel(options.run, limit);
+      const model = buildDashboardModel(opts.run, opts.limit);
       if (!model) {
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ error: { code: 'INTERNAL_ERROR', message: 'Failed to build dashboard model' } }));
@@ -126,7 +148,7 @@ function startServeMode(options: DashboardOptions): void {
 
     if (url === '/health') {
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ ok: true, host, port, watch: options.watch === true, generatedAt: new Date().toISOString() }));
+      res.end(JSON.stringify({ ok: true, host: opts.host, port: opts.port, watch: opts.watch, generatedAt: new Date().toISOString() }));
       return;
     }
 
@@ -136,20 +158,20 @@ function startServeMode(options: DashboardOptions): void {
 
   server.on('error', (err: any) => {
     if (err.code === 'EADDRINUSE') {
-      console.error(`Port ${port} is already in use. Try: moreagent dashboard --serve --port ${port + 1}`);
+      console.error(`Port ${opts.port} is already in use. Try: moreagent dashboard --serve --port ${opts.port + 1}`);
     } else {
       console.error(`Server error: ${err.message}`);
     }
     process.exit(1);
   });
 
-  server.listen(port, host, () => {
-    const url = `http://${host}:${port}/`;
+  server.listen(opts.port, opts.host, () => {
+    const url = `http://${opts.host}:${opts.port}/`;
     console.log(`Dashboard server running at ${url}`);
     console.log('Press Ctrl+C to stop');
 
-    if (options.open) {
-      const result = openInDefaultBrowser(`http://${host}:${port}/`);
+    if (opts.open) {
+      const result = openInDefaultBrowser(`http://${opts.host}:${opts.port}/`);
       if (result.ok) {
         console.log('Opened dashboard in default browser');
       } else {
@@ -158,18 +180,17 @@ function startServeMode(options: DashboardOptions): void {
     }
   });
 
-  process.on('SIGINT', () => {
-    server.close(() => {
-      console.log('\nDashboard server stopped');
-      process.exit(0);
-    });
-  });
-  process.on('SIGTERM', () => {
-    server.close(() => {
-      console.log('\nDashboard server stopped');
-      process.exit(0);
-    });
-  });
+  return {
+    url: `http://${opts.host}:${opts.port}/`,
+    host: opts.host,
+    port: opts.port,
+    close: () => {
+      server.close(() => {
+        console.log('\nDashboard server stopped');
+        process.exit(0);
+      });
+    },
+  };
 }
 
 function getCliPath(): string {
@@ -230,14 +251,21 @@ function buildDashboardModel(selectedRun?: string, limit: number = DEFAULT_LIMIT
   let matchedRunId: string | null = null;
 
   if (selectedRun) {
-    const matched = prefetchedRuns.find(
+    // Search all runs first (not just prefetched)
+    const matchedAll = allRuns.find(
       (r) => r.id === selectedRun || r.id.startsWith(selectedRun)
     );
-    if (!matched) {
-      console.error(`Run not found in prefetched range (limit=${limit}): ${selectedRun}`);
+    if (!matchedAll) {
+      console.error(`Run not found: ${selectedRun}`);
       return null;
     }
-    matchedRunId = matched.id;
+    matchedRunId = matchedAll.id;
+
+    // Include selected run if not in prefetched set
+    const inPrefetched = prefetchedRuns.some((r) => r.id === matchedRunId);
+    if (!inPrefetched) {
+      prefetchedRuns.push(matchedAll);
+    }
   } else {
     matchedRunId = prefetchedRuns[0]?.id ?? null;
   }
@@ -1025,4 +1053,5 @@ export const __dashboardTestHooks = {
   normalizeDecision, normalizeMerge, normalizeWorktree, normalizeGates, normalizeSessions,
   renderErrorBox, renderEmptyState,
   openInDefaultBrowser,
+  startDashboardServer,
 };

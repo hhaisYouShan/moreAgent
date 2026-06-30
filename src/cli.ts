@@ -305,8 +305,9 @@ async function main(): Promise<void> {
           if (dashPortIdx === -1) return undefined;
           const v = args[dashPortIdx + 1];
           if (!v || v.startsWith('-')) exitWithError('Error: --port requires a value');
+          if (!/^[1-9]\d*$/.test(v)) exitWithError('Error: --port must be a positive integer, got: ' + v);
           const n = parseInt(v, 10);
-          if (isNaN(n) || n < 1 || n > 65535) exitWithError('Error: --port must be a positive integer (1-65535), got: ' + v);
+          if (n < 1 || n > 65535) exitWithError('Error: --port must be between 1 and 65535, got: ' + v);
           return n;
         })();
 

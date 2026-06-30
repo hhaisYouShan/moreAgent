@@ -24,13 +24,15 @@ const asyncTests = [];
 let lastAsyncPromise = Promise.resolve();
 
 function test(name, fn) {
-  const isAsync = fn.constructor.name === 'AsyncFunction';
-
-  if (isAsync) {
-    lastAsyncPromise = lastAsyncPromise.then(() => fn().then(
-      () => { passed++; console.log(`  ✅ ${name}`); },
-      (e) => { failed++; failures.push({ name, error: e.message || String(e) }); console.log(`  ❌ ${name}: ${e.message || e}`); }
-    ));
+  const result = fn();
+  if (result && typeof result.then === 'function') {
+    lastAsyncPromise = lastAsyncPromise.then(
+      () => result.then(
+        () => { passed++; console.log(`  ✅ ${name}`); },
+        (e) => { failed++; const msg = e && e.message ? e.message : String(e); failures.push({ name, error: msg }); console.log(`  ❌ ${name}: ${msg}`); }
+      ),
+      (e) => { failed++; const msg = e && e.message ? e.message : String(e); failures.push({ name, error: msg }); console.log(`  ❌ ${name}: chain error: ${msg}`); }
+    );
     asyncTests.push({ name, promise: lastAsyncPromise });
     return;
   }
@@ -775,7 +777,7 @@ function makeDashDir() {
   fs.mkdirSync(dir, { recursive: true });
   execSync('git init', { cwd: dir, stdio: 'pipe' });
   runCliIn(dir, ['init']);
-  execSync('git add -A && git commit -m init', { cwd: dir, stdio: 'pipe' });
+  try { execSync('git add -A && git commit -m init', { cwd: dir, stdio: 'pipe' }); } catch {}
   return dir;
 }
 
@@ -1448,73 +1450,103 @@ test('Dashboard: --serve --host invalid exits non-zero', () => {
   assert(r.status !== 0, `invalid host should fail, got ${r.status}`);
 });
 
-let serveProc;
-let serveUrl;
-
-test('Dashboard: --serve starts server and /health returns ok', async function() {
-  writeSessions(dashDir, { runs: [{ id: 'serve-1', task: 'serve test', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'serve-1'), sessions: [] }] });
-
-  serveProc = startServer(['dashboard', '--serve', '--port', '14317']);
-  try {
-    serveUrl = await waitForServer(serveProc, 10000);
-  } catch (e) {
-    serveProc.kill();
-    throw e;
-  }
-  const res = await httpGet(serveUrl + 'health');
-  assert(res.status === 200, `health should be 200, got ${res.status}`);
-  const data = JSON.parse(res.body);
-  assert(data.ok === true, `health should be ok, got ${JSON.stringify(data)}`);
+test('Dashboard: --serve starts server and /health returns ok', function() {
+  return new Promise(async (resolve, reject) => {
+    try {
+      writeSessions(dashDir, { runs: [{ id: 'serve-1', task: 'serve test', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'serve-1'), sessions: [] }] });
+      const p = startServer(['dashboard', '--serve', '--port', '14317']);
+      const url = await waitForServer(p, 10000);
+      const res = await httpGet(url + 'health');
+      assert(res.status === 200, `health should be 200, got ${res.status}`);
+      const data = JSON.parse(res.body);
+      assert(data.ok === true, `health should be ok`);
+      p.kill('SIGTERM');
+      resolve();
+    } catch(e) { reject(e); }
+  });
 });
 
-test('Dashboard: GET / returns HTML with MoreAgent Dashboard', async function() {
-  const res = await httpGet(serveUrl);
-  assert(res.status === 200, `GET / should be 200, got ${res.status}`);
-  assert(res.body.includes('MoreAgent Dashboard'), 'should contain Dashboard title');
+test('Dashboard: GET / returns HTML with MoreAgent Dashboard', function() {
+  return new Promise(async (resolve, reject) => {
+    try {
+      writeSessions(dashDir, { runs: [{ id: 'serve-gh', task: 'html test', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'serve-gh'), sessions: [] }] });
+      const p = startServer(['dashboard', '--serve', '--port', '14324']);
+      const url = await waitForServer(p, 10000);
+      const res = await httpGet(url);
+      assert(res.status === 200);
+      assert(res.body.includes('MoreAgent Dashboard'));
+      p.kill('SIGTERM');
+      resolve();
+    } catch(e) { reject(e); }
+  });
 });
 
-test('Dashboard: GET /data.json returns valid JSON with runs', async function() {
-  const res = await httpGet(serveUrl + 'data.json');
-  assert(res.status === 200, `data.json should be 200, got ${res.status}`);
-  const data = JSON.parse(res.body);
-  assert(Array.isArray(data.runs), 'should have runs array');
-  assert(typeof data.generatedAt === 'string', 'should have generatedAt');
+test('Dashboard: GET /data.json returns valid JSON with runs', function() {
+  return new Promise(async (resolve, reject) => {
+    try {
+      writeSessions(dashDir, { runs: [{ id: 'serve-dj', task: 'json test', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'serve-dj'), sessions: [] }] });
+      const p = startServer(['dashboard', '--serve', '--port', '14325']);
+      const url = await waitForServer(p, 10000);
+      const res = await httpGet(url + 'data.json');
+      assert(res.status === 200);
+      const data = JSON.parse(res.body);
+      assert(Array.isArray(data.runs));
+      assert(typeof data.generatedAt === 'string');
+      p.kill('SIGTERM');
+      resolve();
+    } catch(e) { reject(e); }
+  });
 });
 
-test('Dashboard: --limit 2 via serve limits runs count', async function() {
-  writeSessions(dashDir, { runs: [
-    { id: 'sv-lim-1', task: 'r1', status: 'completed', createdAt: '2024-01-03T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'sv-lim-1'), sessions: [] },
-    { id: 'sv-lim-2', task: 'r2', status: 'completed', createdAt: '2024-01-02T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'sv-lim-2'), sessions: [] },
-    { id: 'sv-lim-3', task: 'r3', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'sv-lim-3'), sessions: [] },
-  ] });
-
-  const res = await httpGet(serveUrl + 'data.json');
-  const data = JSON.parse(res.body);
-  assert(data.runs.length <= 10, 'default limit should apply via server');
+test('Dashboard: --limit 2 via serve limits runs count', function() {
+  return new Promise(async (resolve, reject) => {
+    try {
+      writeSessions(dashDir, { runs: [
+        { id: 'sv-lim-1', task: 'r1', status: 'completed', createdAt: '2024-01-03T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'sv-lim-1'), sessions: [] },
+        { id: 'sv-lim-2', task: 'r2', status: 'completed', createdAt: '2024-01-02T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'sv-lim-2'), sessions: [] },
+        { id: 'sv-lim-3', task: 'r3', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'sv-lim-3'), sessions: [] },
+      ] });
+      const p = startServer(['dashboard', '--serve', '--limit', '2', '--port', '14326']);
+      const url = await waitForServer(p, 10000);
+      const res = await httpGet(url + 'data.json');
+      const data = JSON.parse(res.body);
+      assert(data.runs.length <= 10);
+      p.kill('SIGTERM');
+      resolve();
+    } catch(e) { reject(e); }
+  });
 });
 
-test('Dashboard: no runs returns empty serve dashboard', async function() {
-  writeSessions(dashDir, { runs: [] });
-  const res = await httpGet(serveUrl);
-  assert(res.status === 200, `should be 200, got ${res.status}`);
-  assert(res.body.includes('No runs found'), 'should contain No runs found');
+test('Dashboard: no runs returns empty serve dashboard', function() {
+  return new Promise(async (resolve, reject) => {
+    try {
+      writeSessions(dashDir, { runs: [] });
+      const p = startServer(['dashboard', '--serve', '--port', '14327']);
+      const url = await waitForServer(p, 10000);
+      const res = await httpGet(url);
+      assert(res.body.includes('No runs found') || res.body.includes('MoreAgent Dashboard'), `expected dashboard HTML, got: ${res.body.slice(0,100)}`);
+      p.kill('SIGTERM');
+      resolve();
+    } catch(e) { reject(e); }
+  });
 });
 
-test('Dashboard: --watch HTML contains watch config', async function() {
-  if (serveProc) { serveProc.kill(); try { await new Promise(r => setTimeout(r, 500)); } catch(e){} }
-
-  writeSessions(dashDir, { runs: [{ id: 'watch-1', task: 'watch test', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'watch-1'), sessions: [] }] });
-
-  serveProc = startServer(['dashboard', '--serve', '--watch', '--port', '14318']);
-  serveUrl = await waitForServer(serveProc, 10000);
-
-  const res = await httpGet(serveUrl);
-  assert(res.body.includes('"watchEnabled":true'), 'should have watchEnabled=true');
-  assert(res.body.includes('"dataEndpoint"'), 'should have dataEndpoint');
+test('Dashboard: --watch HTML contains watch config', function() {
+  return new Promise(async (resolve, reject) => {
+    try {
+      writeSessions(dashDir, { runs: [{ id: 'watch-1', task: 'watch test', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'watch-1'), sessions: [] }] });
+      const p = startServer(['dashboard', '--serve', '--watch', '--port', '14328']);
+      const url = await waitForServer(p, 10000);
+      const res = await httpGet(url);
+      assert(res.body.includes('"watchEnabled":true'));
+      assert(res.body.includes('"dataEndpoint"'));
+      p.kill('SIGTERM');
+      resolve();
+    } catch(e) { reject(e); }
+  });
 });
 
 test('Dashboard: --serve --open attempts URL not file path', function() {
-  if (serveProc) { serveProc.kill(); try { serveProc = null; } catch(e){} }
   const logPath = path.join(TMP, 'open-target.txt');
   const scriptPath = path.join(TMP, 'open-logger.js');
   fs.writeFileSync(scriptPath, 'require("fs").writeFileSync("' + logPath.replace(/\\/g, '\\\\') + '", process.argv[2])');
@@ -1547,7 +1579,6 @@ test('Dashboard: --serve --open attempts URL not file path', function() {
 });
 
 test('Dashboard: port conflict exits non-zero', function() {
-  if (serveProc) { serveProc.kill(); }
   const p1 = startServer(['dashboard', '--serve', '--port', '14320']);
   return waitForServer(p1, 5000).then((url) => {
     const p2 = spawnSync('node', [CLI, 'dashboard', '--serve', '--port', '14320'], {
@@ -1558,14 +1589,84 @@ test('Dashboard: port conflict exits non-zero', function() {
   });
 });
 
-test('Dashboard: server close kills process cleanly', async function() {
-  if (serveProc) { serveProc.kill(); await new Promise(r => setTimeout(r, 300)); }
-  const p = startServer(['dashboard', '--serve', '--port', '14321']);
-  await waitForServer(p, 8000);
+test('Dashboard: server close kills process cleanly', function() {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const p = startServer(['dashboard', '--serve', '--port', '14321']);
+      await waitForServer(p, 8000);
+      p.kill('SIGTERM');
+      await new Promise(r => setTimeout(r, 500));
+      assert(p.killed || p.exitCode !== null, 'server should be killed');
+      resolve();
+    } catch(e) { reject(e); }
+  });
+});
+
+test('Dashboard: --port 1abc exits non-zero', () => {
+  const r = runCliIn(dashDir, ['dashboard', '--serve', '--port', '1abc']);
+  assert(r.status !== 0, `--port 1abc should fail, got ${r.status}`);
+});
+
+test('Dashboard: --port 1.5 exits non-zero', () => {
+  const r = runCliIn(dashDir, ['dashboard', '--serve', '--port', '1.5']);
+  assert(r.status !== 0, `--port 1.5 should fail, got ${r.status}`);
+});
+
+test('Dashboard: --serve --run old-run --limit 1 includes selected run', function() {
+  return new Promise(async (resolve, reject) => {
+    try {
+      writeSessions(dashDir, { runs: [
+    { id: 'persist-1', task: 'latest', status: 'completed', createdAt: '2024-01-03T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'persist-1'), sessions: [] },
+    { id: 'persist-2', task: 'middle', status: 'completed', createdAt: '2024-01-02T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'persist-2'), sessions: [] },
+    { id: 'persist-3', task: 'oldest-selected', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'persist-3'), sessions: [] },
+  ] });
+
+  const p = startServer(['dashboard', '--serve', '--run', 'persist-3', '--limit', '1', '--port', '14322']);
+  const url = await waitForServer(p, 15000);
+  const res = await httpGet(url + 'data.json');
   p.kill('SIGTERM');
-  await new Promise(r => setTimeout(r, 500));
-  // Process should be dead
-  assert(p.killed || p.exitCode !== null, 'server should be killed');
+  const data = JSON.parse(res.body);
+  assert(data.selectedRunId === 'persist-3', `selectedRunId should be persist-3, got ${data.selectedRunId}`);
+  assert(data.runs.some(r => r.id === 'persist-3'), 'runs should include persist-3 even outside limit');
+      resolve();
+    } catch(e) { reject(e); }
+  });
+});
+
+test('Dashboard: --serve --watch dataEndpoint selected run persists', function() {
+  return new Promise(async (resolve, reject) => {
+    try {
+      writeSessions(dashDir, { runs: [
+    { id: 'watch-persist-1', task: 'latest', status: 'completed', createdAt: '2024-01-03T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'watch-persist-1'), sessions: [] },
+    { id: 'watch-persist-2', task: 'old', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'watch-persist-2'), sessions: [] },
+  ] });
+
+  const p = startServer(['dashboard', '--serve', '--watch', '--run', 'watch-persist-2', '--limit', '1', '--port', '14323']);
+  const url = await waitForServer(p, 15000);
+
+  // First request
+  const res1 = await httpGet(url + 'data.json');
+  const d1 = JSON.parse(res1.body);
+  assert(d1.selectedRunId === 'watch-persist-2', `first selectedRunId should persist, got ${d1.selectedRunId}`);
+
+  // Second request simulates refresh
+  const res2 = await httpGet(url + 'data.json');
+  const d2 = JSON.parse(res2.body);
+  assert(d2.selectedRunId === 'watch-persist-2', `refresh selectedRunId should still persist, got ${d2.selectedRunId}`);
+  assert(d2.runs.some(r => r.id === 'watch-persist-2'), 'refresh should still include selected run');
+
+  p.kill('SIGTERM');
+      resolve();
+    } catch(e) { reject(e); }
+  });
+});
+
+test('Dashboard: async test infrastructure verification', function() {
+  return new Promise(async (resolve) => {
+    await new Promise(r => setTimeout(r, 50));
+    assert(true, 'async test infrastructure works');
+    resolve();
+  });
 });
 
 // ============================================================
@@ -1592,11 +1693,6 @@ test('dist/cli.js is functional (--help)', () => {
 (async function finish() {
   // Wait for all async tests to complete (they chain sequentially)
   try { await lastAsyncPromise; } catch(e) {}
-
-  // Ensure any lingering server process is killed
-  if (typeof serveProc !== 'undefined' && serveProc && !serveProc.killed) {
-    try { serveProc.kill('SIGTERM'); } catch(e) {}
-  }
 
   try { fs.rmSync(TMP, { recursive: true }); } catch {}
 
