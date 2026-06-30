@@ -1,7 +1,9 @@
 node_modules/
-dist/
+
 .moreagent/
 .opencode/
 *.js.map
 *.d.ts
 *.d.ts.map
+dist/
+review-packets/
