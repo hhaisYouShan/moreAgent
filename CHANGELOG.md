@@ -1,5 +1,40 @@
 # Changelog
 
+## V2.4 (2026-06-30)
+
+### Added — Documentation Update
+- README expanded with dashboard quick start, report quick start, JSON output use cases, and common command examples
+- New `docs/dashboard-usage.md` covering:
+  - `moreagent dashboard`
+  - `--open`
+  - `--run`
+  - `--limit`
+  - `--output`
+  - page regions
+  - MVP degradation
+  - empty dashboard
+  - open failure handling
+- New `docs/report-usage.md` covering:
+  - `report --latest`
+  - `report --run <id>`
+  - `--json`
+  - `overallStatus`
+  - `recommendation`
+  - merge readiness
+  - relationship between report and dashboard
+- New `docs/troubleshooting.md` covering common user-facing errors and recovery steps:
+  - No runs found
+  - Run not found in prefetched range
+  - Open failed
+  - workflow unavailable / MVP run
+  - Report unavailable
+  - Detail unavailable
+  - Merge readiness unavailable
+  - Sessions unavailable
+  - main repository not clean
+  - worktree missing
+  - JSON parse failed
+
 ## V2.3 (2026-06-30)
 
 ### Added — Dashboard `--open`

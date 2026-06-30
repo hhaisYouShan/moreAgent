@@ -140,6 +140,96 @@ Show the latest run with per-session details:
 moreagent status --latest
 ```
 
+### Dashboard Quick Start
+
+Generate the static HTML dashboard:
+
+```bash
+moreagent dashboard
+```
+
+Generate and open the dashboard in the default browser:
+
+```bash
+moreagent dashboard --open
+```
+
+Generate a dashboard with a specific run selected:
+
+```bash
+moreagent dashboard --run run-2026-06-29T12-00-00-abc123
+```
+
+Control the number of prefetched runs:
+
+```bash
+moreagent dashboard --limit 5
+```
+
+Write to a custom output path:
+
+```bash
+moreagent dashboard --output /tmp/moreagent-dashboard.html
+```
+
+Typical combinations:
+
+```bash
+moreagent dashboard --run run-2026-06-29T12-00-00-abc123 --open
+moreagent dashboard --limit 20 --open
+moreagent dashboard --run run-2026-06-29T12-00-00-abc123 --limit 5 --output /tmp/dash.html --open
+```
+
+The dashboard is a static HTML file. It does not start a server, does not auto-refresh, and does not watch for changes.
+
+### Report Quick Start
+
+Show the latest workflow report:
+
+```bash
+moreagent report --latest
+```
+
+Show a specific run report:
+
+```bash
+moreagent report --run run-2026-06-29T12-00-00-abc123
+```
+
+Get machine-readable JSON:
+
+```bash
+moreagent report --latest --json
+moreagent report --run run-2026-06-29T12-00-00-abc123 --json
+```
+
+Use `report` when you want a single run's final decision and merge readiness in one place.
+Use `dashboard` when you want a visual multi-run view with sidebar switching and debug panels.
+
+### JSON Output
+
+Use `--json` when:
+
+1. You want machine-readable output for scripts or CI.
+2. You want to inspect structured data behind `status`, `inspect`, or `report`.
+3. You want to compare raw command data with dashboard rendering.
+
+Common examples:
+
+```bash
+moreagent status --json
+moreagent status --run run-2026-06-29T12-00-00-abc123 --summary --json
+moreagent inspect --run run-2026-06-29T12-00-00-abc123 --workflow --json
+moreagent report --latest --json
+```
+
+JSON mode is especially useful for:
+
+- CI checks
+- automation scripts
+- debugging dashboard data issues
+- verifying `overallStatus`, `recommendation`, and merge readiness programmatically
+
 ### Clean State
 
 Clean run artifacts and reset `sessions.json`:
@@ -199,6 +289,70 @@ moreagent inspect --run run-2026-06-29T12-00-00-abc123
 ```
 
 For repair sessions (e.g. `repair-1-tester`), `--agent tester` finds the latest tester-related session first.
+
+### Dashboard and Report Concepts
+
+The dashboard and report commands are related, but they serve different purposes:
+
+- `dashboard`
+  - Static HTML view
+  - Best for humans
+  - Shows multiple runs, sidebar switching, sessions, workflow, debug JSON
+
+- `report`
+  - Single-run summary
+  - Best for CLI review or CI consumption
+  - Focuses on `overallStatus`, `recommendation`, gates, quality, and merge readiness
+
+### MVP Run vs Full Workflow Run
+
+In Dashboard and Report views:
+
+- MVP run
+  - Usually uses the architect / implementer / tester / reviewer pipeline
+  - Dashboard shows `workflow unavailable / MVP run`
+  - This is expected degradation, not an error
+
+- Full workflow run
+  - Uses the full multi-phase workflow
+  - Dashboard shows the 9 workflow phases
+  - Report includes full workflow phase progress and gate decisions
+
+### Merge Readiness and Recommendation
+
+The most important report/dashboard decision fields are:
+
+- `overallStatus`
+  - `PASSED`
+  - `FAILED`
+  - `RUNNING`
+  - `PARTIAL`
+  - `UNKNOWN`
+
+- `recommendation`
+  - `MERGE_READY`
+  - `BLOCKED`
+  - `NEEDS_REPAIR`
+  - `NEEDS_REVIEW`
+  - `RUNNING`
+  - `UNKNOWN`
+
+Practical interpretation:
+
+- `MERGE_READY`
+  - Run passed and is ready to merge
+- `BLOCKED`
+  - Run passed, but merge is blocked by worktree or main repo state
+- `NEEDS_REPAIR`
+  - Run failed and should go back through repair / resume flow
+- `NEEDS_REVIEW`
+  - Data is incomplete or partially unknown; check details manually
+
+See:
+
+- [dashboard-usage.md](/Users/lihaishan/Desktop/openCodeAI/moreAgent/docs/dashboard-usage.md)
+- [report-usage.md](/Users/lihaishan/Desktop/openCodeAI/moreAgent/docs/report-usage.md)
+- [troubleshooting.md](/Users/lihaishan/Desktop/openCodeAI/moreAgent/docs/troubleshooting.md)
 
 ### Artifact Decision Markers
 
