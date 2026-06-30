@@ -1053,6 +1053,52 @@ test('Dashboard: BLOCKED shows blocked reason explanation', () => {
   try { fs.unlinkSync(path.join(dashDir, '.moreagent', 'dirty-test')); } catch {}
 });
 
+test('Dashboard: completed run with FAILED overallStatus shows run-failed in sidebar', () => {
+  const runId = 'dash-v21-comp-failed';
+  writeArtifactForReport(dashDir, runId, 'tester', 'test-report.md', 'Result: FAIL\n\n# Test\nFailed tests');
+  writeArtifactForReport(dashDir, runId, 'reviewer', 'review-report.md', 'Decision: CHANGES_REQUESTED\n\n# Review');
+  writeSessions(dashDir, { runs: [{
+    id: runId, task: 'completed but failed', status: 'completed',
+    createdAt: '2024-01-01T00:00:00Z',
+    artifactDir: path.join(dashDir, '.moreagent', 'runs', runId),
+    sessions: [
+      { id: 'c-1', agentName: 'tester', status: 'completed', artifactDir: path.join(dashDir, '.moreagent', 'runs', runId, 'tester'), startedAt: '2024-01-01T00:00:00Z', runId },
+      { id: 'c-2', agentName: 'reviewer', status: 'completed', artifactDir: path.join(dashDir, '.moreagent', 'runs', runId, 'reviewer'), startedAt: '2024-01-01T00:00:00Z', runId },
+    ],
+  }] });
+
+  const r = runCliIn(dashDir, ['dashboard', '--run', runId, '--output', path.join(TMP, 'dash-v21-comp-failed.html')]);
+  const html = fs.readFileSync(path.join(TMP, 'dash-v21-comp-failed.html'), 'utf-8');
+  assert(html.includes('run-failed'), 'completed run with FAIL decision should have run-failed class');
+});
+
+test('Dashboard: NEEDS_REPAIR merge explanation does not say BLOCKED', () => {
+  const runId = 'dash-v21-repair';
+  writeSessions(dashDir, { runs: [{
+    id: runId, task: 'needs repair', status: 'failed',
+    createdAt: '2024-01-01T00:00:00Z',
+    artifactDir: path.join(dashDir, '.moreagent', 'runs', runId),
+    workflow: { profile: 'full', completedPhases: ['brain', 'prd'], failedPhase: 'prd-review' },
+    sessions: [
+      { id: 'r-1', agentName: 'brain', status: 'completed', artifactDir: '/tmp/b', startedAt: '2024-01-01T00:00:00Z', runId },
+      { id: 'r-2', agentName: 'product', status: 'completed', artifactDir: '/tmp/p', startedAt: '2024-01-01T00:00:00Z', runId },
+    ],
+  }] });
+
+  const r = runCliIn(dashDir, ['dashboard', '--run', runId, '--output', path.join(TMP, 'dash-v21-repair.html')]);
+  const html = fs.readFileSync(path.join(TMP, 'dash-v21-repair.html'), 'utf-8');
+
+  // The sidebar should have run-failed (NEEDS_REPAIR)
+  assert(html.includes('run-failed'), 'NEEDS_REPAIR run should have run-failed class');
+
+  // The merge explanation should NOT say BLOCKED for NEEDS_REPAIR
+  // Check that the NEEDS_REPAIR explanation text exists in the HTML
+  assert(html.includes('not merge ready'), 'NEEDS_REPAIR explanation should include not merge ready');
+
+  // Also verify the sidebar shows run-failed
+  assert(html.includes('run-failed'), 'NEEDS_REPAIR run should have run-failed class');
+});
+
 test('Dashboard: JSON / Debug section still accessible', () => {
   const runId = 'dash-v21-debug';
   writeSessions(dashDir, { runs: [{

@@ -310,7 +310,7 @@ window.__MOREAGENT_DASHBOARD_DATA__ = ${dataJson};
 
       var sel = r.id===currentRunId ? ' selected' : '';
       var extraClass = '';
-      if (r.status==='failed') extraClass = ' run-failed';
+      if (r.status==='failed' || (decision && decision.overallStatus==='FAILED') || (decision && decision.recommendation==='NEEDS_REPAIR')) extraClass = ' run-failed';
       else if (r.status==='running') extraClass = ' run-running';
       else if (decision && decision.recommendation==='MERGE_READY') extraClass = ' run-merge_ready';
 
@@ -546,12 +546,24 @@ window.__MOREAGENT_DASHBOARD_DATA__ = ${dataJson};
     if (decision.recommendation==='MERGE_READY') {
       return 'MERGE_READY: Run has passed all checks \u2014 overall status is PASSED, main repository is clean, worktree exists, and merge is permitted.';
     }
-    var reasons = [];
-    if (decision.overallStatus!=='PASSED') reasons.push('overall status is not PASSED (currently: '+decision.overallStatus+')');
-    if (!merge.canMerge) reasons.push('canMerge is false'+(merge.blockedReason?' ('+merge.blockedReason+')':''));
-    if (!merge.mainClean) reasons.push('main repository is not clean (has uncommitted changes)');
-    if (!wt.exists) reasons.push('worktree does not exist or is missing');
-    return 'BLOCKED: '+(reasons.length>0 ? reasons.join('; ') : 'merge is blocked for unknown reason')+'.';
+    if (decision.recommendation==='BLOCKED') {
+      var reasons = [];
+      if (decision.overallStatus!=='PASSED') reasons.push('overall status is not PASSED (currently: '+decision.overallStatus+')');
+      if (!merge.canMerge) reasons.push('canMerge is false'+(merge.blockedReason?' ('+merge.blockedReason+')':''));
+      if (!merge.mainClean) reasons.push('main repository is not clean (has uncommitted changes)');
+      if (!wt.exists) reasons.push('worktree does not exist or is missing');
+      return 'BLOCKED: '+(reasons.length>0 ? reasons.join('; ') : 'merge is blocked for unknown reason')+'.';
+    }
+    if (decision.recommendation==='NEEDS_REPAIR') {
+      return 'NEEDS_REPAIR: Run failed and can be resumed \u2014 not merge ready. Use resume to continue the workflow.';
+    }
+    if (decision.recommendation==='NEEDS_REVIEW') {
+      return 'NEEDS_REVIEW: Not all gates are decided \u2014 not merge ready. Review pending gates before considering merge.';
+    }
+    if (decision.recommendation==='RUNNING') {
+      return 'RUNNING: Run is still in progress \u2014 not merge ready. Wait for the run to complete.';
+    }
+    return 'UNKNOWN: Cannot determine merge readiness.';
   }
 
   window.toggleDebug = function() {
