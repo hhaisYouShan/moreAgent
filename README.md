@@ -350,9 +350,9 @@ Practical interpretation:
 
 See:
 
-- [dashboard-usage.md](/Users/lihaishan/Desktop/openCodeAI/moreAgent/docs/dashboard-usage.md)
-- [report-usage.md](/Users/lihaishan/Desktop/openCodeAI/moreAgent/docs/report-usage.md)
-- [troubleshooting.md](/Users/lihaishan/Desktop/openCodeAI/moreAgent/docs/troubleshooting.md)
+- [dashboard-usage.md](docs/dashboard-usage.md)
+- [report-usage.md](docs/report-usage.md)
+- [troubleshooting.md](docs/troubleshooting.md)
 
 ### Artifact Decision Markers
 
