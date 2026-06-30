@@ -484,3 +484,128 @@ moreagent status --run <id> --json
 moreagent report --run <id> --json
 moreagent inspect --run <id> --workflow --json
 ```
+
+## Showing last successful data / stale data (serve mode)
+
+### What you see
+
+- `Refresh failed` in the runtime status strip
+- `Showing last successful data` persists below the error
+- Dashboard content does not match the most recent CLI state
+
+### Why it happens
+
+`/data.json` returned an error but the page intentionally retained the previous successful data. This prevents the dashboard from going blank when a single refresh fails.
+
+### What to do
+
+The dashboard is still showing the last good snapshot. Diagnose the failure:
+
+```bash
+curl http://127.0.0.1:4317/data.json
+curl http://127.0.0.1:4317/health
+```
+
+If using `--watch`, the next poll cycle retries automatically. To force a refresh, click "Refresh data" in the dashboard.
+
+### Related commands
+
+```bash
+moreagent dashboard --serve
+curl http://127.0.0.1:4317/data.json
+curl http://127.0.0.1:4317/health
+```
+
+## Partial child errors (serve mode)
+
+### What you see
+
+- `Refreshed with partial errors (N)` in the runtime status strip
+- Specific run detail blocks show: `Detail unavailable` (statusError), `Report unavailable` (reportError), or `Workflow unavailable` (workflowError)
+- Overall dashboard loads successfully — other runs display normally
+
+### Why it happens
+
+`/data.json` returned a valid model, but some runs in `runDetailsById` have error entries from failed sub-commands (`status --run`, `report --run`, `inspect --workflow`). This is a **partial success**.
+
+### What to do
+
+Inspect the affected run directly:
+
+```bash
+moreagent status --run <id> --json
+moreagent report --run <id> --json
+moreagent inspect --run <id> --workflow --json
+```
+
+Error details are also visible in the dashboard's JSON / Debug tab.
+
+### Related commands
+
+```bash
+moreagent dashboard --serve
+moreagent status --run <id> --json
+moreagent report --run <id> --json
+moreagent inspect --run <id> --workflow --json
+```
+
+## Selected run not found during refresh (serve mode)
+
+### What you see
+
+- After a refresh, the selected run area appears blank or missing
+- `Showing last successful data` may appear
+
+### Why it happens
+
+The server was started with `--run <id>`, but a subsequent `/data.json` refresh did not include that run. In V3.0+, the selected run is always force-included — this error should be rare.
+
+### What to do
+
+Restart the server. Verify the run exists:
+
+```bash
+moreagent status --run <id>
+moreagent dashboard --serve --run <id>
+```
+
+### Related commands
+
+```bash
+moreagent dashboard --serve --run <id>
+moreagent status --run <id> --json
+```
+
+## No runs is not a refresh error (serve mode)
+
+### What you see
+
+- `No runs found` in the dashboard
+- Runtime status strip still shows `Refresh data` button
+- `Watch` mode continues polling — no error indicator
+
+### Why it happens
+
+There are no runs in the project. This is an **empty state**, not an error. In watch mode, the page continues polling — new runs auto-render on the next successful refresh.
+
+### What to do
+
+Run a task:
+
+```bash
+moreagent start --once --task "your task"
+```
+
+To verify server state:
+
+```bash
+moreagent status --json
+```
+
+### Related commands
+
+```bash
+moreagent start --once --task "your task"
+moreagent dashboard --serve --watch
+moreagent status --json
+```
