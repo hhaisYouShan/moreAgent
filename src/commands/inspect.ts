@@ -22,6 +22,14 @@ export function inspectCommand(options: InspectOptions = {}): void {
   }
 
   if (options.workflow) {
+    const isFull = run.workflow || run.sessions.some((s) => s.agentName.startsWith('brain') || s.agentName.startsWith('product'));
+    if (!isFull) {
+      if (options.json) {
+        printJsonError('NOT_FULL_WORKFLOW', 'This run is not a full workflow run.');
+      }
+      console.log('This run is not a full workflow run.');
+      return;
+    }
     if (options.json) {
       printJson(buildWorkflowModel(run));
       return;

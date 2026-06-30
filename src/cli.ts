@@ -16,6 +16,14 @@ import { statusCommand } from './commands/status';
 import { startCommand } from './commands/start';
 import { isJsonMode, printJsonError } from './output/json';
 
+function exitWithError(message: string): never {
+  if (isJsonMode(process.argv.slice(2))) {
+    printJsonError('BAD_ARGS', message);
+  }
+  console.error(message);
+  process.exit(1);
+}
+
 function printHelp(): void {
   console.log(`
 MoreAgent — Multi-agent orchestration tool for OpenCode CLI
@@ -116,20 +124,17 @@ async function main(): Promise<void> {
           } else if (resumeRunId) {
             await startCommand({ once: true, task: '', resume: true, resumeRunId });
           } else {
-            console.error('Error: --resume requires --run <id> or --latest');
-            process.exit(1);
+            exitWithError('Error: --resume requires --run <id> or --latest');
           }
           break;
         }
 
         if (!args.includes('--once')) {
-          console.error('Error: use --once, --loop, or --resume with start command');
-          process.exit(1);
+          exitWithError('Error: use --once, --loop, or --resume with start command');
         }
 
         if (fromPhase && !args.includes('--task')) {
-          console.error('Error: --task is required with --from-phase');
-          process.exit(1);
+          exitWithError('Error: --task is required with --from-phase');
         }
 
         const taskIdx = args.indexOf('--task');
@@ -147,8 +152,7 @@ async function main(): Promise<void> {
         if (sub === 'add') {
           const qTaskIdx = args.indexOf('--task');
           if (qTaskIdx === -1 || !args[qTaskIdx + 1]) {
-            console.error('Error: --task <description> is required for queue add');
-            process.exit(1);
+            exitWithError('Error: --task <description> is required for queue add');
           }
           queueAddCommand({ task: args[qTaskIdx + 1] });
         } else if (sub === 'list') {
@@ -158,13 +162,11 @@ async function main(): Promise<void> {
         } else if (sub === 'retry') {
           const retryIdx = args.indexOf('--task');
           if (retryIdx === -1 || !args[retryIdx + 1]) {
-            console.error('Error: --task <taskId> is required for queue retry');
-            process.exit(1);
+            exitWithError('Error: --task <taskId> is required for queue retry');
           }
           queueRetryCommand({ task: args[retryIdx + 1] });
         } else {
-          console.error('Usage: moreagent queue <add|list|recover|retry>');
-          process.exit(1);
+          exitWithError('Usage: moreagent queue <add|list|recover|retry>');
         }
         break;
       }
@@ -212,16 +214,14 @@ async function main(): Promise<void> {
           } else {
             const agentIdx = args.indexOf('--agent');
             if (agentIdx === -1 || !args[agentIdx + 1]) {
-              console.error('Usage: moreagent sessions reset --agent <name> or --all');
-              process.exit(1);
+              exitWithError('Usage: moreagent sessions reset --agent <name> or --all');
             }
             sessionsResetCommand(args[agentIdx + 1]);
           }
         } else if (sub === 'export') {
           sessionsExportCommand(args.includes('--json'));
         } else {
-          console.error('Usage: moreagent sessions <list|reset|export>');
-          process.exit(1);
+          exitWithError('Usage: moreagent sessions <list|reset|export>');
         }
         break;
       }
@@ -247,9 +247,7 @@ async function main(): Promise<void> {
       }
 
       default:
-        console.error(`Unknown command: ${command}`);
-        printHelp();
-        process.exit(1);
+        exitWithError(`Unknown command: ${command}`);
     }
   } catch (err: any) {
     if (args.includes('--json')) {

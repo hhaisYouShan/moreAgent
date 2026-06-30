@@ -470,6 +470,41 @@ test('JSON: durationSeconds is number or null', () => {
   }
 });
 
+test('JSON: empty sessions dir — status --json returns error', () => {
+  const dir = path.join(TMP, 'empty');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.mkdirSync(path.join(dir, '.moreagent'), { recursive: true });
+  fs.writeFileSync(path.join(dir, '.moreagent', 'sessions.json'), JSON.stringify({ runs: [] }));
+  const r = runCliIn(dir, ['status', '--json']);
+  assert(r.status !== 0, 'should exit non-zero for empty sessions');
+  const data = JSON.parse(r.stdout);
+  assert(data.error, 'missing error object');
+});
+
+test('JSON: inspect --workflow --json on non-full run returns error', () => {
+  const r = runCliIn(jsonTestDir, ['inspect', '--run', 'json-run', '--workflow', '--json']);
+  assert(r.status !== 0, 'should exit non-zero for non-full workflow');
+  const data = JSON.parse(r.stdout);
+  assert(data.error, 'missing error object');
+  assert(data.error.code === 'NOT_FULL_WORKFLOW',
+    `expected NOT_FULL_WORKFLOW, got ${data.error.code}`);
+});
+
+test('JSON: unknown command --json returns JSON error', () => {
+  const r = runCliIn(jsonTestDir, ['unknownfoo', '--json']);
+  assert(r.status !== 0, 'should exit non-zero');
+  const data = JSON.parse(r.stdout);
+  assert(data.error, 'missing error object');
+  assert(!r.stdout.includes('MoreAgent'), 'stdout should NOT contain help text');
+});
+
+test('JSON: start --resume --json without --run returns JSON error', () => {
+  const r = runCliIn(jsonTestDir, ['start', '--resume', '--json']);
+  assert(r.status !== 0, 'should exit non-zero');
+  const data = JSON.parse(r.stdout);
+  assert(data.error, 'missing error object');
+});
+
 // ============================================================
 // 5. BUILD CHECK
 // ============================================================
