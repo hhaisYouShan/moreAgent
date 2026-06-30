@@ -294,10 +294,11 @@ window.__MOREAGENT_DASHBOARD_DATA__ = ${dataJson};
       if (currentFilter==='all') return true;
       if (currentFilter==='full') return (r.profile||r.workflow?.profile)==='full';
       var details = getDetails(r.id);
-      var rec = (details&&details.report&&details.report.report&&details.report.report.decision)
-        ? details.report.report.decision.recommendation : '';
+      var report = (details&&details.report&&details.report.report) ? details.report.report : null;
+      var decision = report ? report.decision : null;
+      var rec = decision ? decision.recommendation : '';
+      var os = decision ? decision.overallStatus : '';
       if (currentFilter==='failed') {
-        var os = decision ? decision.overallStatus : '';
         return r.status==='failed'||rec==='NEEDS_REPAIR'||os==='FAILED';
       }
       if (currentFilter==='running') return r.status==='running';

@@ -1071,6 +1071,7 @@ test('Dashboard: completed run with FAILED overallStatus shows run-failed in sid
   const html = fs.readFileSync(path.join(TMP, 'dash-v21-comp-failed.html'), 'utf-8');
   assert(html.includes('run-failed'), 'completed run with FAIL decision should have run-failed class');
   assert(html.includes("overallStatus==='FAILED'"), 'failed filter should include overallStatus FAILED check');
+  assert(html.includes('var decision = report ? report.decision : null'), 'filter callback should define decision from report');
 });
 
 test('Dashboard: NEEDS_REPAIR merge explanation does not say BLOCKED', () => {
@@ -1091,6 +1092,7 @@ test('Dashboard: NEEDS_REPAIR merge explanation does not say BLOCKED', () => {
 
   assert(html.includes('run-failed'), 'NEEDS_REPAIR run should have run-failed class');
   assert(html.includes('not merge ready'), 'NEEDS_REPAIR explanation should include not merge ready');
+  assert(!html.includes("'BLOCKED:'"), 'NEEDS_REPAIR explanation should not use BLOCKED: prefix');
 });
 
 test('Dashboard: JSON / Debug section still accessible', () => {
