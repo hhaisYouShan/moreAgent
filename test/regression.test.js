@@ -610,6 +610,144 @@ test('Report: text output is non-empty', () => {
 });
 
 // ============================================================
+// 5b. V1.9.1 Report Boundary Hardening
+// ============================================================
+
+console.log('\n5b. Report Boundary (V1.9.1)');
+console.log('============================');
+
+test('Report: --latest --json returns valid JSON with latest run.id and decision', () => {
+  const runId = 'report-latest-json';
+  writeSessions(reportDir, { runs: [{
+    id: runId, task: 'latest json test', status: 'completed',
+    createdAt: '2024-01-01T00:00:00Z',
+    artifactDir: path.join(reportDir, '.moreagent', 'runs', runId),
+    sessions: [],
+  }] });
+  const r = runCliIn(reportDir, ['report', '--latest', '--json']);
+  assert(r.status === 0, `should exit 0, got ${r.status}`);
+  const data = JSON.parse(r.stdout);
+  assert(data.report.run.id === runId, `expected ${runId}, got ${data.report.run.id}`);
+  assert(data.report.decision !== undefined, 'missing decision');
+});
+
+test('Report: --json defaults to latest (equivalent to --latest --json)', () => {
+  const runId = 'report-json-default';
+  writeSessions(reportDir, { runs: [
+    { id: 'old-run', task: 'old', status: 'completed', createdAt: '2023-01-01T00:00:00Z', artifactDir: '/tmp/old', sessions: [] },
+    { id: runId, task: 'newest', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId), sessions: [] },
+  ] });
+
+  const r1 = runCliIn(reportDir, ['report', '--json']);
+  const r2 = runCliIn(reportDir, ['report', '--latest', '--json']);
+  assert(r1.status === 0 && r2.status === 0, 'both should exit 0');
+  const d1 = JSON.parse(r1.stdout);
+  const d2 = JSON.parse(r2.stdout);
+  assert(d1.report.run.id === runId, `--json: expected ${runId}, got ${d1.report.run.id}`);
+  assert(d2.report.run.id === runId, `--latest --json: expected ${runId}, got ${d2.report.run.id}`);
+  assert(d1.report.run.id === d2.report.run.id, '--json and --latest --json should return same run');
+});
+
+test('Report: --run missing non-json shows text error', () => {
+  const r = runCliIn(reportDir, ['report', '--run', 'nonexistent-run-id']);
+  assert(r.stdout.includes('Run not found'), `expected "Run not found", got: ${r.stdout.slice(0, 200)}`);
+  let isJson = false;
+  try { JSON.parse(r.stdout); isJson = true; } catch {}
+  assert(!isJson, 'non-json mode should not output parseable JSON');
+});
+
+test('Report: full workflow all gates APPROVED => PASSED', () => {
+  const runId = 'report-full-passed';
+  writeArtifactForReport(reportDir, runId, 'tester', 'test-report.md', 'Result: PASS\n\nOK');
+  writeArtifactForReport(reportDir, runId, 'reviewer', 'review-report.md', 'Decision: APPROVED\n\nOK');
+  writeArtifactForReport(reportDir, runId, 'prd-reviewer', 'prd-decision.md', 'Decision: APPROVED\n\nOK');
+  writeArtifactForReport(reportDir, runId, 'tech-reviewer', 'tech-review.md', 'Decision: APPROVED\n\nOK');
+  writeSessions(reportDir, { runs: [{
+    id: runId, task: 'full approved', status: 'completed',
+    createdAt: '2024-01-01T00:00:00Z',
+    artifactDir: path.join(reportDir, '.moreagent', 'runs', runId),
+    workflow: { profile: 'full', completedPhases: [] },
+    sessions: [
+      { id: 't-1', agentName: 'tester', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'tester'), startedAt: '2024-01-01T00:00:00Z', runId },
+      { id: 'r-1', agentName: 'reviewer', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'reviewer'), startedAt: '2024-01-01T00:00:00Z', runId },
+      { id: 'pr-1', agentName: 'prd-reviewer', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'prd-reviewer'), startedAt: '2024-01-01T00:00:00Z', runId },
+      { id: 'tr-1', agentName: 'tech-reviewer', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'tech-reviewer'), startedAt: '2024-01-01T00:00:00Z', runId },
+    ],
+  }] });
+  const r = runCliIn(reportDir, ['report', '--run', runId, '--json']);
+  const data = JSON.parse(r.stdout);
+  assert(data.report.decision.overallStatus === 'PASSED', `expected PASSED, got ${data.report.decision.overallStatus}`);
+  assert(data.report.gates.prdGate === 'APPROVED', `prdGate=${data.report.gates.prdGate}`);
+  assert(data.report.gates.techGate === 'APPROVED', `techGate=${data.report.gates.techGate}`);
+});
+
+test('Report: full workflow gate CHANGES_REQUESTED => FAILED', () => {
+  const runId = 'report-full-cr';
+  writeArtifactForReport(reportDir, runId, 'tester', 'test-report.md', 'Result: PASS\n\nOK');
+  writeArtifactForReport(reportDir, runId, 'reviewer', 'review-report.md', 'Decision: APPROVED\n\nOK');
+  writeArtifactForReport(reportDir, runId, 'prd-reviewer', 'prd-decision.md', 'Decision: CHANGES_REQUESTED\n\nNeeds work');
+  writeArtifactForReport(reportDir, runId, 'tech-reviewer', 'tech-review.md', 'Decision: APPROVED\n\nOK');
+  writeSessions(reportDir, { runs: [{
+    id: runId, task: 'full cr', status: 'completed',
+    createdAt: '2024-01-01T00:00:00Z',
+    artifactDir: path.join(reportDir, '.moreagent', 'runs', runId),
+    workflow: { profile: 'full', completedPhases: [] },
+    sessions: [
+      { id: 't-1', agentName: 'tester', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'tester'), startedAt: '2024-01-01T00:00:00Z', runId },
+      { id: 'r-1', agentName: 'reviewer', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'reviewer'), startedAt: '2024-01-01T00:00:00Z', runId },
+      { id: 'pr-1', agentName: 'prd-reviewer', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'prd-reviewer'), startedAt: '2024-01-01T00:00:00Z', runId },
+      { id: 'tr-1', agentName: 'tech-reviewer', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'tech-reviewer'), startedAt: '2024-01-01T00:00:00Z', runId },
+    ],
+  }] });
+  const r = runCliIn(reportDir, ['report', '--run', runId, '--json']);
+  const data = JSON.parse(r.stdout);
+  assert(data.report.decision.overallStatus === 'FAILED', `expected FAILED, got ${data.report.decision.overallStatus}`);
+  assert(data.report.gates.prdGate === 'CHANGES_REQUESTED', `prdGate=${data.report.gates.prdGate}`);
+});
+
+test('Report: JSON schema field stability', () => {
+  const runId = 'report-schema';
+  writeArtifactForReport(reportDir, runId, 'tester', 'test-report.md', 'Result: PASS\n\nOK');
+  writeArtifactForReport(reportDir, runId, 'reviewer', 'review-report.md', 'Decision: APPROVED\n\nOK');
+  writeSessions(reportDir, { runs: [{
+    id: runId, task: 'schema test', status: 'completed',
+    createdAt: '2024-01-01T00:00:00Z',
+    artifactDir: path.join(reportDir, '.moreagent', 'runs', runId),
+    sessions: [
+      { id: 't-1', agentName: 'tester', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'tester'), startedAt: '2024-01-01T00:00:00Z', runId },
+      { id: 'r-1', agentName: 'reviewer', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'reviewer'), startedAt: '2024-01-01T00:00:00Z', runId },
+    ],
+  }] });
+  const r = runCliIn(reportDir, ['report', '--run', runId, '--json']);
+  const data = JSON.parse(r.stdout);
+
+  const requiredFields = [
+    ['report', 'run', 'id'],
+    ['report', 'run', 'task'],
+    ['report', 'run', 'status'],
+    ['report', 'workflow', 'completedPhases'],
+    ['report', 'workflow', 'totalPhases'],
+    ['report', 'gates', 'prdGate'],
+    ['report', 'gates', 'techGate'],
+    ['report', 'quality', 'test'],
+    ['report', 'quality', 'review'],
+    ['report', 'worktree', 'hasWorktree'],
+    ['report', 'merge', 'canMerge'],
+    ['report', 'merge', 'mainClean'],
+    ['report', 'decision', 'overallStatus'],
+    ['report', 'decision', 'recommendation'],
+  ];
+
+  for (const fieldPath of requiredFields) {
+    let obj = data;
+    for (const key of fieldPath) {
+      assert(obj && typeof obj === 'object' && key in obj, `missing field: ${fieldPath.join('.')}`);
+      obj = obj[key];
+    }
+  }
+});
+
+// ============================================================
 // 6. BUILD CHECK
 // ============================================================
 

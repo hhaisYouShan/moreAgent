@@ -1,5 +1,22 @@
 # Changelog
 
+## V1.9.1 (2026-06-30)
+
+### Added
+- **Report boundary hardening**: 6 new regression tests covering edge cases
+  - `report --latest --json` returns valid JSON with latest run.id and decision
+  - `report --json` defaults to latest (equivalent to `--latest --json`)
+  - `report --run missing` non-json shows text error, not JSON
+  - full workflow all gates APPROVED => `overallStatus: PASSED`
+  - full workflow gate CHANGES_REQUESTED => `overallStatus: FAILED`
+  - JSON schema field stability (14 required fields verified)
+
+### Verified
+- `report --json` and `report --latest --json` produce identical results
+- Full workflow gate logic correctly distinguishes APPROVED/CHANGES_REQUESTED
+- Non-json error output maintains backward compatibility
+- No code changes needed — all boundary behaviors already correct
+
 ## V1.9 (2026-06-30)
 
 ### Added
