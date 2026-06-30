@@ -296,7 +296,10 @@ window.__MOREAGENT_DASHBOARD_DATA__ = ${dataJson};
       var details = getDetails(r.id);
       var rec = (details&&details.report&&details.report.report&&details.report.report.decision)
         ? details.report.report.decision.recommendation : '';
-      if (currentFilter==='failed') return r.status==='failed'||rec==='NEEDS_REPAIR';
+      if (currentFilter==='failed') {
+        var os = decision ? decision.overallStatus : '';
+        return r.status==='failed'||rec==='NEEDS_REPAIR'||os==='FAILED';
+      }
       if (currentFilter==='running') return r.status==='running';
       if (currentFilter==='completed') return r.status==='completed';
       return true;

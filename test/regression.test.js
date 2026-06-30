@@ -1070,6 +1070,7 @@ test('Dashboard: completed run with FAILED overallStatus shows run-failed in sid
   const r = runCliIn(dashDir, ['dashboard', '--run', runId, '--output', path.join(TMP, 'dash-v21-comp-failed.html')]);
   const html = fs.readFileSync(path.join(TMP, 'dash-v21-comp-failed.html'), 'utf-8');
   assert(html.includes('run-failed'), 'completed run with FAIL decision should have run-failed class');
+  assert(html.includes("overallStatus==='FAILED'"), 'failed filter should include overallStatus FAILED check');
 });
 
 test('Dashboard: NEEDS_REPAIR merge explanation does not say BLOCKED', () => {
@@ -1088,15 +1089,8 @@ test('Dashboard: NEEDS_REPAIR merge explanation does not say BLOCKED', () => {
   const r = runCliIn(dashDir, ['dashboard', '--run', runId, '--output', path.join(TMP, 'dash-v21-repair.html')]);
   const html = fs.readFileSync(path.join(TMP, 'dash-v21-repair.html'), 'utf-8');
 
-  // The sidebar should have run-failed (NEEDS_REPAIR)
   assert(html.includes('run-failed'), 'NEEDS_REPAIR run should have run-failed class');
-
-  // The merge explanation should NOT say BLOCKED for NEEDS_REPAIR
-  // Check that the NEEDS_REPAIR explanation text exists in the HTML
   assert(html.includes('not merge ready'), 'NEEDS_REPAIR explanation should include not merge ready');
-
-  // Also verify the sidebar shows run-failed
-  assert(html.includes('run-failed'), 'NEEDS_REPAIR run should have run-failed class');
 });
 
 test('Dashboard: JSON / Debug section still accessible', () => {
