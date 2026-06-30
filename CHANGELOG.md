@@ -18,7 +18,7 @@
 
 ### Fixed
 - **Protocol parser**: `matchProtocolLine()` supports bold-wrapped lines (`**Decision: APPROVED**`, `**Result: PASS**`, `**Owner: frontend**`) in addition to bare lines. Updated in `start.ts`, `status.ts`, `inspect.ts`.
-- **Result anti-match**: `Result: FAILURES: 0` no longer matches as FAIL. Parser uses `\S+` word capture, callers check exact values.
+- **Result anti-match**: `Result: FAILURES: 0` no longer matches as FAIL. Parser uses `\S+` word capture, callers check exact values. Note: `FAILURES: 0` is treated as `unknown` (not FAIL and not PASS) — the parser only recognizes exact `Result: PASS` and `Result: FAIL` lines. This is by design: "0 failures" does not guarantee "all tests passed".
 - **Merge dry-run**: Main project dirty check moved to `--apply` only. Dry-run always outputs run info, worktree diff, and merge readiness.
 - **Pending session filter**: `isHiddenFullWorkflowPending()` hides full workflow base sessions (frontend/backend/product) when phase alias sessions exist and base session is pending-without-startedAt. Affects `status --latest-full` summary and session list.
 - **Merge apply dirty detection**: Differentiates `.moreagent/` runtime changes from business file changes. Provides targeted error messages.
