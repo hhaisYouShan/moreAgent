@@ -179,7 +179,21 @@ moreagent start --once --task "your task"
 
 If `--open` fails, the HTML file or server is still operational. Check the printed path/URL and access manually.
 
-## Related Commands
+## Serve Runtime Status (V3.1)
+
+In `--serve` mode, the page shows a runtime status strip at the top with:
+
+| Element | Description |
+|---------|-------------|
+| `Last refreshed` | Timestamp of last successful `/data.json` fetch |
+| `Refreshing...` | Shown during active fetch |
+| `Refresh failed` | Shown when fetch fails; page retains last successful data |
+| `Showing last successful data` | Indicates stale data is still displayed |
+| `Refreshed with partial errors (N)` | Fetch succeeded but N runs have sub-errors |
+
+**No-runs behavior:** A serve page with no runs still shows the Refresh data button and runtime status. Watch mode continues polling — new runs auto-appear on the next successful refresh.
+
+**Related Commands**
 
 ```bash
 moreagent report --latest

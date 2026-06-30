@@ -1794,6 +1794,8 @@ test('V3.1: no-runs serves refreshes to show new runs without crash', function()
       const res1 = await httpGet(url + 'data.json');
       const d1 = JSON.parse(res1.body);
       assert(d1.runs.length === 0, 'initially no runs');
+      assert(d1.selectedRunId === null, 'initial selectedRunId should be null');
+      assert(d1.generatedAt, 'should have generatedAt');
 
       // Add a run without restarting server
       writeSessions(dashDir, { runs: [{ id: 'v31-newrun', task: 'appeared later', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'v31-newrun'), sessions: [] }] });
@@ -1803,11 +1805,16 @@ test('V3.1: no-runs serves refreshes to show new runs without crash', function()
       const d2 = JSON.parse(res2.body);
       assert(d2.runs.length === 1, 'should now have 1 run after refresh');
       assert(d2.selectedRunId === 'v31-newrun', 'selectedRunId should be the new run');
+      assert(d2.runs[0].id === 'v31-newrun', 'run id should be v31-newrun');
+      assert(d2.runs[0].task === 'appeared later', 'run task should be preserved');
+      assert(d2.runDetailsById['v31-newrun'], 'runDetailsById should have entry');
+      assert(d2.generatedAt, 'should have generatedAt');
 
-      // HTML should still render
+      // HTML should render with the new run
       const res3 = await httpGet(url);
       assert(res3.body.includes('MoreAgent Dashboard'), 'HTML should still render');
       assert(res3.body.includes('v31-newrun'), 'HTML should contain the new run');
+      assert(res3.body.includes('appeared later'), 'HTML should contain the task text');
 
       p.kill('SIGTERM');
       resolve();

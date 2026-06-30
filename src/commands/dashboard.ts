@@ -486,7 +486,7 @@ window.__MOREAGENT_DASHBOARD_RUNTIME__ = ${runtimeJson};
   var currentFilter = 'all';
 
   // === All function and variable definitions (must come before early return) ===
-  var FULL_PHASES = ['brain','prd','prd-review','prd-gate','tech-plan','tech-gate','implementation','test','review'];${"\n"}
+  var FULL_PHASES = ['brain','prd','prd-review','prd-gate','tech-plan','tech-gate','implementation','test','review'];
   // -- serve mode runtime -- (must init before any early returns)
   var RT = window.__MOREAGENT_DASHBOARD_RUNTIME__ || {};
   if (RT.serveMode) { initServeRuntime(); }
