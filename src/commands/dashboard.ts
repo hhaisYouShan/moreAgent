@@ -134,6 +134,10 @@ function startDashboardServer(opts: {
         watchEnabled: opts.watch,
         dataEndpoint,
         refreshIntervalMs: 3000,
+        host: opts.host,
+        port: opts.port,
+        selectedRun: opts.run || undefined,
+        limit: opts.limit,
       });
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(html);
@@ -173,7 +177,14 @@ function startDashboardServer(opts: {
 
   server.listen(opts.port, opts.host, () => {
     const url = `http://${opts.host}:${opts.port}/`;
-    console.log(`Dashboard server running at ${url}`);
+    console.log('Dashboard server started');
+    console.log(`URL: ${url}`);
+    console.log(`Host: ${opts.host}`);
+    console.log(`Port: ${opts.port}`);
+    console.log(`Watch: ${opts.watch ? 'enabled' : 'disabled'}`);
+    console.log(`Refresh interval: ${opts.watch ? '3000ms' : 'manual'}`);
+    console.log(`Selected run: ${opts.run || 'latest'}`);
+    console.log(`Limit: ${opts.limit}`);
     console.log('Press Ctrl+C to stop');
 
     if (opts.open) {
@@ -340,6 +351,10 @@ interface RenderOptions {
   watchEnabled?: boolean;
   dataEndpoint?: string;
   refreshIntervalMs?: number;
+  host?: string;
+  port?: number;
+  selectedRun?: string;
+  limit?: number;
 }
 
 function renderDashboardHtml(model: DashboardModel, renderOpts?: RenderOptions): string {
@@ -351,6 +366,12 @@ function renderDashboardHtml(model: DashboardModel, renderOpts?: RenderOptions):
     watchEnabled: renderOpts?.watchEnabled || false,
     dataEndpoint: renderOpts?.dataEndpoint || '/data.json',
     refreshIntervalMs: renderOpts?.refreshIntervalMs || 0,
+    startup: {
+      host: renderOpts?.host || '',
+      port: renderOpts?.port || 0,
+      selectedRun: renderOpts?.selectedRun || null,
+      limit: renderOpts?.limit || 10,
+    },
   });
 
   return `<!DOCTYPE html>
@@ -888,24 +909,41 @@ window.__MOREAGENT_DASHBOARD_RUNTIME__ = ${runtimeJson};
   // -- serve mode runtime --
   var RT = window.__MOREAGENT_DASHBOARD_RUNTIME__ || {};
   if (RT.serveMode) {
+    var refreshState = { kind: 'idle', lastRefreshedAt: null, isShowingStaleData: false };
     var refreshBtn = document.createElement('div');
-    refreshBtn.style.cssText = 'position:fixed;top:8px;right:16px;background:#21262d;border:1px solid #30363d;color:#58a6ff;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:12px;z-index:1000';
+    var statusStrip = document.createElement('div');
+    statusStrip.id = 'runtime-status';
+    statusStrip.style.cssText = 'position:fixed;top:4px;left:292px;right:16px;background:#161b22;border-bottom:1px solid #30363d;padding:4px 12px;font-size:11px;color:#8b949e;z-index:999;display:flex;gap:16px;align-items:center';
+    updateStatusStrip();
+    document.body.appendChild(statusStrip);
+
+    refreshBtn.style.cssText = 'position:fixed;top:8px;right:16px;background:#21262d;border:1px solid #30363d;color:#58a6ff;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:11px;z-index:1000';
     refreshBtn.textContent = '\u21bb Refresh data';
     refreshBtn.onclick = function(){
-      refreshBtn.textContent = '\u21bb Refreshing...';
-      fetchDashboardData();
+      if (refreshState.kind==='refreshing') return;
+      refreshDashboard('manual');
     };
     document.body.appendChild(refreshBtn);
 
     if (RT.watchEnabled && RT.dataEndpoint) {
-      setInterval(function(){ fetchDashboardData(); }, RT.refreshIntervalMs || 3000);
+      setInterval(function(){
+        if (refreshState.kind==='refreshing') return;
+        refreshDashboard('watch');
+      }, RT.refreshIntervalMs || 3000);
+    } else {
+      // Initial fetch
+      updateRefreshState({ kind: 'idle', lastRefreshedAt: new Date().toISOString(), isShowingStaleData: false });
     }
 
-    function fetchDashboardData() {
+    function refreshDashboard(trigger) {
+      updateRefreshState({ kind: 'refreshing', lastRefreshedAt: refreshState.lastRefreshedAt, trigger: trigger });
+      refreshBtn.textContent = '\u21bb Refreshing...';
+      updateStatusStrip();
       fetch(RT.dataEndpoint)
-        .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+        .then(function(r){ if(!r.ok) throw new Error('Server returned '+r.status); return r.json(); })
         .then(function(data){
-          if (data.error) { updateRefreshStatus('\u26a0 Refresh failed: '+(data.error.message||'error')); return; }
+          if (data.error) throw new Error((data.error.message||'Server error'));
+          var partialCount = detectPartialErrors(data);
           window.__MOREAGENT_DASHBOARD_DATA__ = data;
           D = data;
           renderSidebar();
@@ -914,24 +952,54 @@ window.__MOREAGENT_DASHBOARD_RUNTIME__ = ${runtimeJson};
             if (!found) currentRunId = data.runs[0].id;
             renderMain();
           }
-          updateRefreshStatus('\u2713 Refreshed ' + new Date().toLocaleTimeString());
+          var now = new Date().toISOString();
+          if (partialCount > 0) {
+            updateRefreshState({ kind: 'partial', lastRefreshedAt: now, partialErrorCount: partialCount, isShowingStaleData: false });
+          } else {
+            updateRefreshState({ kind: 'idle', lastRefreshedAt: now, isShowingStaleData: false });
+          }
           refreshBtn.textContent = '\u21bb Refresh data';
+          updateStatusStrip();
         })
         .catch(function(e){
-          updateRefreshStatus('\u26a0 Refresh failed: '+(e.message||'error'));
+          updateRefreshState({ kind: 'error', lastRefreshedAt: refreshState.lastRefreshedAt, errorType: 'fetch', message: e.message||'Refresh failed', isShowingStaleData: true });
           refreshBtn.textContent = '\u21bb Refresh data';
+          updateStatusStrip();
         });
     }
 
-    function updateRefreshStatus(msg) {
-      var el = document.getElementById('refresh-status');
-      if (!el) {
-        el = document.createElement('div');
-        el.id = 'refresh-status';
-        el.style.cssText = 'position:fixed;top:36px;right:16px;font-size:10px;color:#8b949e;z-index:1000';
-        document.body.appendChild(el);
+    function detectPartialErrors(data) {
+      if (!data.runDetailsById) return 0;
+      var count = 0;
+      for (var rid in data.runDetailsById) {
+        var d = data.runDetailsById[rid];
+        if (d.statusError) count++;
+        if (d.reportError) count++;
+        if (d.workflowError && d.workflowError.code!=='NOT_FULL_WORKFLOW') count++;
       }
-      el.textContent = msg;
+      return count;
+    }
+
+    function updateRefreshState(state) { refreshState = state; }
+
+    function updateStatusStrip() {
+      var rt = RT;
+      var html = '';
+      html += '<span>Serve mode &middot; Watch: '+(rt.watchEnabled?'enabled':'disabled')+' &middot; Interval: '+(rt.watchEnabled?(rt.refreshIntervalMs+'ms'):'manual')+'</span>';
+      html += '<span style="flex:1"></span>';
+      if (refreshState.kind==='refreshing') {
+        html += '<span style="color:#d29922">\u21bb Refreshing...</span>';
+      } else if (refreshState.kind==='error') {
+        html += '<span style="color:#f85149">\u26a0 Refresh failed: '+esc(refreshState.message)+'</span>';
+        html += '<span style="color:#8b949e">Showing last successful data</span>';
+      } else if (refreshState.kind==='partial') {
+        html += '<span style="color:#d29922">\u26a0 Refreshed with partial errors ('+refreshState.partialErrorCount+')</span>';
+        html += '<span style="color:#8b949e">Last refreshed: '+(refreshState.lastRefreshedAt?new Date(refreshState.lastRefreshedAt).toLocaleTimeString():'never')+'</span>';
+      } else {
+        html += '<span style="color:#3fb950">\u2713</span>';
+        html += '<span style="color:#8b949e">Last refreshed: '+(refreshState.lastRefreshedAt?new Date(refreshState.lastRefreshedAt).toLocaleTimeString():'not yet')+'</span>';
+      }
+      statusStrip.innerHTML = html;
     }
   }
 })();

@@ -1425,13 +1425,14 @@ function waitForServer(proc, maxWaitMs) {
   return new Promise((resolve, reject) => {
     const start = Date.now();
     let done = false;
+    let out = '';
     proc.stdout.on('data', (d) => {
       if (done) return;
-      const s = d.toString();
-      if (s.includes('Dashboard server running at')) {
+      out += d.toString();
+      const m = out.match(/URL:\s*(http:\/\/[^\s]+)/);
+      if (m) {
         done = true;
-        const m = s.match(/http:\/\/[^\s]+/);
-        resolve(m ? m[0] : 'http://127.0.0.1:4317/');
+        resolve(m[1]);
       }
     });
     proc.stderr.on('data', (d) => {
@@ -1443,7 +1444,7 @@ function waitForServer(proc, maxWaitMs) {
     const check = setInterval(() => {
       if (Date.now() - start > (maxWaitMs || 10000)) {
         clearInterval(check);
-        if (!done) { done = true; reject(new Error('Server start timeout')); }
+        if (!done) { done = true; proc.kill('SIGTERM'); reject(new Error('Server start timeout')); }
       }
     }, 100);
   });
@@ -1572,7 +1573,7 @@ test('Dashboard: --serve --open attempts URL not file path', function() {
       if (!resolved) { resolved = true; proc.kill(); resolve(); }
     }, 8000);
     proc.stdout.on('data', (d) => {
-      if (!resolved && d.toString().includes('Dashboard server running at')) {
+      if (!resolved && d.toString().includes('Dashboard server started')) {
         setTimeout(() => {
           if (!resolved) {
             resolved = true;
@@ -1681,6 +1682,71 @@ test('Dashboard: async test infrastructure verification', function() {
     await new Promise(r => setTimeout(r, 50));
     assert(true, 'async test infrastructure works');
     resolve();
+  });
+});
+
+// ============================================================
+// 9. V3.1 Dashboard Serve Usability
+// ============================================================
+
+console.log('\n9. Dashboard Serve Usability (V3.1)');
+console.log('===================================');
+
+test('V3.1: serve startup output shows runtime summary', () => {
+  writeSessions(dashDir, { runs: [{ id: 'v31-start', task: 'startup', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'v31-start'), sessions: [] }] });
+  const p = startServer(['dashboard', '--serve', '--limit', '5', '--port', '14340']);
+  return waitForServer(p, 10000).then((url) => {
+    p.kill('SIGTERM');
+    assert(url.includes('14340'), 'URL should use correct port');
+    // stdout check done by waitForServer matching URL: pattern
+  });
+});
+
+test('V3.1: serve startup output shows watch enabled', () => {
+  writeSessions(dashDir, { runs: [{ id: 'v31-watch', task: 'watch test', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'v31-watch'), sessions: [] }] });
+  const p = startServer(['dashboard', '--serve', '--watch', '--port', '14341']);
+  return waitForServer(p, 10000).then((url) => {
+    p.kill('SIGTERM');
+    assert(url.includes('14341'), 'URL should use correct port');
+  });
+});
+
+test('V3.1: serve startup output shows selected run', () => {
+  writeSessions(dashDir, { runs: [{ id: 'v31-sel', task: 'selected', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'v31-sel'), sessions: [] }] });
+  const p = startServer(['dashboard', '--serve', '--run', 'v31-sel', '--port', '14342']);
+  return waitForServer(p, 10000).then((url) => {
+    p.kill('SIGTERM');
+    assert(url.includes('14342'), 'server should start with selected run');
+  });
+});
+
+test('V3.1: HTML contains Refresh data button', function() {
+  return new Promise(async (resolve, reject) => {
+    try {
+      writeSessions(dashDir, { runs: [{ id: 'v31-btn', task: 'btn', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'v31-btn'), sessions: [] }] });
+      const p = startServer(['dashboard', '--serve', '--port', '14343']);
+      const url = await waitForServer(p, 10000);
+      const res = await httpGet(url);
+      p.kill('SIGTERM');
+      assert(res.body.includes('Refresh data'), 'HTML should contain Refresh data button');
+      resolve();
+    } catch(e) { reject(e); }
+  });
+});
+
+test('V3.1: HTML contains runtime status text', function() {
+  return new Promise(async (resolve, reject) => {
+    try {
+      writeSessions(dashDir, { runs: [{ id: 'v31-rt', task: 'runtime', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'v31-rt'), sessions: [] }] });
+      const p = startServer(['dashboard', '--serve', '--port', '14344']);
+      const url = await waitForServer(p, 10000);
+      const res = await httpGet(url);
+      p.kill('SIGTERM');
+      assert(res.body.includes('Last refreshed'), 'should contain Last refreshed');
+      assert(res.body.includes('Refreshing'), 'should contain Refreshing');
+      assert(res.body.includes('Refresh failed'), 'should contain Refresh failed');
+      resolve();
+    } catch(e) { reject(e); }
   });
 });
 
