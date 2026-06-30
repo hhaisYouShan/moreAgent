@@ -292,6 +292,11 @@ window.__MOREAGENT_DASHBOARD_DATA__ = ${dataJson};
   var currentRunId = '${selectedId}';
   var currentFilter = 'all';
 
+  if (D.runs.length === 0) {
+    renderSidebar();
+    return;
+  }
+
   var FULL_PHASES = ['brain','prd','prd-review','prd-gate','tech-plan','tech-gate','implementation','test','review'];
 
   // ---- Safe ViewModel helpers (browser-side) ----
@@ -501,6 +506,7 @@ window.__MOREAGENT_DASHBOARD_DATA__ = ${dataJson};
       html += '</div>';
     }
     html += '</div></div>';
+    }
 
     // C. Gate / Test / Review
     html += '<div class="section"><div class="section-title">Gate / Test / Review</div><div class="section-body">';
@@ -769,7 +775,8 @@ export function normalizeWorktree(report: any): {
 
 export function normalizeGates(report: any): { prdGate: string; techGate: string; test: string; review: string } {
   const g: any = getNested(report, ['report', 'gates'], null);
-  return { prdGate: safeText(g?.prdGate, 'unknown'), techGate: safeText(g?.techGate, 'unknown'), test: safeText(g?.test, 'unknown'), review: safeText(g?.review, 'unknown') };
+  const quality: any = getNested(report, ['report', 'quality'], null);
+  return { prdGate: safeText(g?.prdGate, 'unknown'), techGate: safeText(g?.techGate, 'unknown'), test: safeText(quality?.test, 'unknown'), review: safeText(quality?.review, 'unknown') };
 }
 
 export function normalizeSessions(statusRun: any): { state: 'ok' | 'empty' | 'unavailable'; message: string | null } {

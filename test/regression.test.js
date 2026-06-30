@@ -1243,6 +1243,41 @@ test('Helper: normalizeSessions returns unavailable for missing sessions', () =>
   assert(normalizeSessions({ run: { sessions: [] } }).state === 'empty');
 });
 
+test('Helper: normalizeGates reads test/review from quality field', () => {
+  const report = { report: { gates: { prdGate: 'APPROVED', techGate: 'APPROVED' }, quality: { test: 'PASS', review: 'APPROVED' } } };
+  const result = normalizeGates(report);
+  assert(result.prdGate === 'APPROVED', 'prdGate should be APPROVED');
+  assert(result.techGate === 'APPROVED', 'techGate should be APPROVED');
+  assert(result.test === 'PASS', 'test should be PASS (from quality)');
+  assert(result.review === 'APPROVED', 'review should be APPROVED (from quality)');
+});
+
+test('Dashboard: MVP run renders all sections (not trapped in full_ok else)', () => {
+  const runId = 'dash-v22-mvp-sec';
+  writeSessions(dashDir, { runs: [{
+    id: runId, task: 'mvp sections', status: 'completed',
+    createdAt: '2024-01-01T00:00:00Z',
+    artifactDir: path.join(dashDir, '.moreagent', 'runs', runId),
+    sessions: [
+      { id: 'm-1', agentName: 'implementer', status: 'completed', artifactDir: path.join(dashDir, '.moreagent', 'runs', runId, 'implementer'), startedAt: '2024-01-01T00:00:00Z', runId },
+    ],
+  }] });
+
+  const r = runCliIn(dashDir, ['dashboard', '--run', runId, '--output', path.join(TMP, 'dash-v22-mvp-sec.html')]);
+  const html = fs.readFileSync(path.join(TMP, 'dash-v22-mvp-sec.html'), 'utf-8');
+  // MVP run should still have Gate, Repair, Merge, Sessions, JSON/Debug sections
+  assert(html.includes('Gate / Test / Review'), 'MVP should still have Gate section');
+  assert(html.includes('Repair Sessions'), 'MVP should still have Repair Sessions');
+  assert(html.includes('Merge Readiness'), 'MVP should still have Merge Readiness');
+  assert(html.includes('JSON / Debug'), 'MVP should still have JSON/Debug');
+});
+
+test('Dashboard: empty dashboard script includes runs.length guard', () => {
+  const html = fs.readFileSync(path.join(TMP, 'dash-empty.html'), 'utf-8');
+  assert(html.includes('D.runs.length === 0'), 'empty dashboard should guard against no runs');
+  assert(html.includes('No runs found'), 'should still show No runs found');
+});
+
 // ============================================================
 // 6. BUILD CHECK
 // ============================================================
