@@ -168,9 +168,18 @@ async function main(): Promise<void> {
         break;
       }
 
-      case 'status':
-        statusCommand({ latest: args.includes('--latest') });
+      case 'status': {
+        const statusRunIdx = args.indexOf('--run');
+        const statusRunId = statusRunIdx !== -1 ? args[statusRunIdx + 1] : undefined;
+        statusCommand({
+          latest: args.includes('--latest') && !args.includes('--latest-repair') && !args.includes('--latest-full'),
+          latestRepair: args.includes('--latest-repair'),
+          latestFull: args.includes('--latest-full'),
+          run: statusRunId,
+          summary: args.includes('--summary'),
+        });
         break;
+      }
 
       case 'diff': {
         const diffRunIdx = args.indexOf('--run');
@@ -187,7 +196,7 @@ async function main(): Promise<void> {
         const inspectAgentIdx = args.indexOf('--agent');
         const inspectAgent =
           inspectAgentIdx !== -1 ? args[inspectAgentIdx + 1] : undefined;
-        inspectCommand({ run: inspectRunId, agent: inspectAgent });
+        inspectCommand({ run: inspectRunId, agent: inspectAgent, workflow: args.includes('--workflow') });
         break;
       }
 

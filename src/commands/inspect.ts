@@ -6,12 +6,18 @@ import { Run, Session } from '../types';
 export interface InspectOptions {
   run?: string;
   agent?: string;
+  workflow?: boolean;
 }
 
 export function inspectCommand(options: InspectOptions = {}): void {
   const run = findRun(options.run);
   if (!run) {
     console.log('No runs found.');
+    return;
+  }
+
+  if (options.workflow) {
+    printWorkflowInfo(run);
     return;
   }
 
@@ -184,4 +190,87 @@ function getWorktreePath(run: Run): string | undefined {
     }
   }
   return run.sessions.find((s) => s.worktreePath)?.worktreePath;
+}
+
+function printWorkflowInfo(run: Run): void {
+  if (!run.workflow && !run.sessions.some((s) => s.agentName.startsWith('brain') || s.agentName.startsWith('product'))) {
+    console.log('This run is not a full workflow run.');
+    return;
+  }
+
+  console.log(`Run: ${run.id}`);
+  console.log(`Task: ${run.task}`);
+  console.log(`Status: ${run.status}`);
+
+  const wf = run.workflow;
+  if (wf) {
+    console.log(`  Profile: ${wf.profile}`);
+    console.log(`  Current Phase: ${wf.currentPhase || 'N/A'}`);
+    console.log(`  Completed Phases: ${wf.completedPhases.join(', ') || '(none)'}`);
+    console.log(`  Failed Phase: ${wf.failedPhase || 'N/A'}`);
+  }
+
+  console.log('');
+  console.log('Gates:');
+  const sessions = [...run.sessions];
+  for (const s of sessions) {
+    const dir = s.artifactDir;
+    if (!fs.existsSync(dir)) continue;
+    for (const f of fs.readdirSync(dir)) {
+      if (!f.endsWith('.md')) continue;
+      const fp = path.join(dir, f);
+      const c = readFileSafe(fp);
+      if (!c) continue;
+      if (f.startsWith('prd-decision')) console.log(`  PRD Gate (${f}): ${parseDecisionLine(c)}`);
+      if (f.startsWith('tech-review')) console.log(`  Tech Gate (${f}): ${parseDecisionLine(c)}`);
+      if (f.includes('test-report')) console.log(`  Test (${f}): ${parseResultLine(c)}`);
+      if (f.includes('review-report')) console.log(`  Review (${f}): ${parseDecisionLine(c)}`);
+    }
+  }
+
+  const repairSessions = sessions.filter((s) => {
+    const n = s.agentName;
+    return n.includes('repair') || n.includes('retry') || n.includes('failure-analysis') || n.includes('revision');
+  });
+  if (repairSessions.length > 0) {
+    console.log('');
+    console.log(`Repair Sessions: ${repairSessions.length}`);
+    for (const s of repairSessions) {
+      console.log(`  ${s.agentName} (${s.status})`);
+      if (s.error) console.log(`    Error: ${s.error}`);
+    }
+  }
+
+  const lastFailed = [...sessions].reverse().find((s) => s.status === 'failed');
+  if (lastFailed) {
+    console.log('');
+    console.log(`Final Failed Session: ${lastFailed.agentName}`);
+    if (lastFailed.error) console.log(`  Error: ${lastFailed.error}`);
+  }
+
+  console.log('');
+  console.log('Suggested Commands:');
+  console.log(`  moreagent inspect --run ${run.id}`);
+  for (const s of repairSessions.slice(0, 3)) {
+    console.log(`  moreagent inspect --run ${run.id} --agent ${s.agentName}`);
+  }
+}
+
+function readFileSafe(fp: string): string | null {
+  try {
+    const c = fs.readFileSync(fp, 'utf-8').trim();
+    return c.length > 0 ? c : null;
+  } catch { return null; }
+}
+
+function parseDecisionLine(c: string): string {
+  if (/^Decision:\s*CHANGES_REQUESTED\s*$/im.test(c)) return 'CHANGES_REQUESTED';
+  if (/^Decision:\s*APPROVED\s*$/im.test(c)) return 'APPROVED';
+  return 'unknown';
+}
+
+function parseResultLine(c: string): string {
+  if (/^Result:\s*FAIL\s*$/im.test(c)) return 'FAIL';
+  if (/^Result:\s*PASS\s*$/im.test(c)) return 'PASS';
+  return 'unknown';
 }
