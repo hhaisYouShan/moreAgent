@@ -37,14 +37,30 @@ export function mergeCommand(options: MergeOptions): void {
   }
 
   const mainStatus = getMainStatus();
-  if (mainStatus !== '') {
-    throw new Error(
-      'Main project has uncommitted changes. Please commit or stash them first.\n' +
-        `  git status: ${mainStatus}`
-    );
-  }
+  const mainStatusLines = mainStatus ? mainStatus.split('\n') : [];
+  const onlyMoreagentDirty = mainStatusLines.length > 0 && mainStatusLines.every(
+    (l) => l.includes('.moreagent/') || l.includes('.opencode/')
+  );
 
   if (options.apply) {
+    if (mainStatus !== '') {
+      if (onlyMoreagentDirty) {
+        console.log('Main project only has MoreAgent runtime changes under .moreagent/.');
+        console.log('Commit/stash them or add .moreagent/ to .gitignore before applying merge.\n');
+      } else {
+        console.log('Main project has uncommitted changes in business files:');
+        for (const l of mainStatusLines) {
+          if (!l.includes('.moreagent/') && !l.includes('.opencode/')) {
+            console.log(`  ${l}`);
+          }
+        }
+        console.log('');
+      }
+      throw new Error(
+        'Main project is not clean. Please commit or stash changes before applying merge.'
+      );
+    }
+    // ... rest of apply logic unchanged
     const hasCommits = worktreeHasCommitsAhead(worktreePath, branch);
     if (!hasCommits) {
       console.log('');

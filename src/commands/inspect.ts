@@ -263,14 +263,27 @@ function readFileSafe(fp: string): string | null {
   } catch { return null; }
 }
 
+function matchLine(content: string, key: string): string | null {
+  for (const line of content.split('\n')) {
+    const t = line.trim();
+    const bare = new RegExp(`^${key}:\\s*(\\S+)`, 'i').exec(t);
+    if (bare) return bare[1];
+    const bold = new RegExp(`^\\*\\*${key}:\\s*(\\S+)\\*\\*`, 'i').exec(t);
+    if (bold) return bold[1];
+  }
+  return null;
+}
+
 function parseDecisionLine(c: string): string {
-  if (/^Decision:\s*CHANGES_REQUESTED\s*$/im.test(c)) return 'CHANGES_REQUESTED';
-  if (/^Decision:\s*APPROVED\s*$/im.test(c)) return 'APPROVED';
+  const v = matchLine(c, 'Decision');
+  if (v === 'CHANGES_REQUESTED') return 'CHANGES_REQUESTED';
+  if (v === 'APPROVED') return 'APPROVED';
   return 'unknown';
 }
 
 function parseResultLine(c: string): string {
-  if (/^Result:\s*FAIL\s*$/im.test(c)) return 'FAIL';
-  if (/^Result:\s*PASS\s*$/im.test(c)) return 'PASS';
+  const v = matchLine(c, 'Result');
+  if (v === 'FAIL') return 'FAIL';
+  if (v === 'PASS') return 'PASS';
   return 'unknown';
 }

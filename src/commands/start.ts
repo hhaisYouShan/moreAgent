@@ -279,13 +279,23 @@ interface ArtifactDecision {
 function evaluateGateArtifactFile(agentDir: string, fileName: string): ArtifactDecision {
   const content = readArtifactFromDir(agentDir, fileName);
   if (!content) return { passed: true };
-  if (/^Decision:\s*CHANGES_REQUESTED\s*$/im.test(content)) {
-    return { passed: false, reason: `Gate decision: ${fileName} contains "Decision: CHANGES_REQUESTED"` };
-  }
-  if (/^Decision:\s*APPROVED\s*$/im.test(content)) {
-    return { passed: true };
-  }
+  const decision = matchProtocolLine(content, 'Decision');
+  if (decision === 'CHANGES_REQUESTED') return { passed: false, reason: `Gate decision: ${fileName} contains "Decision: CHANGES_REQUESTED"` };
+  if (decision === 'APPROVED') return { passed: true };
   return { passed: true };
+}
+
+function matchProtocolLine(content: string, key: string): string | null {
+  const trimmed = content.split('\n').map((l) => l.trim());
+  for (const line of trimmed) {
+    // Bare line: Decision: APPROVED
+    const bare = new RegExp(`^${key}:\\s*(\\S+)`, 'i').exec(line);
+    if (bare) return bare[1];
+    // Bold-wrapped: **Decision: APPROVED**
+    const bold = new RegExp(`^\\*\\*${key}:\\s*(\\S+)\\*\\*`, 'i').exec(line);
+    if (bold) return bold[1];
+  }
+  return null;
 }
 
 function readArtifactFromDir(agentDir: string, fileName: string): string | null {
@@ -799,7 +809,7 @@ async function runFailureAnalysis(
   const content = readArtifact(res.agentDir, 'failure-analysis.md');
   if (!content) return { owner: null };
 
-  const match = content.match(/^Owner:\s*(\S+)/m);
+  const match = matchProtocolLine(content, 'Owner');
   if (!match) return { owner: null };
 
   const valid = ['frontend', 'backend', 'tester', 'product', 'tech-plan', 'unknown'];
@@ -810,23 +820,17 @@ function evaluateArtifactDecisionForFile(agentDir: string, fileName: string): Ar
   if (fileName.includes('test-report')) {
     const content = readArtifactFromDir(agentDir, fileName);
     if (!content) return { passed: true };
-    if (/^Result:\s*FAIL\s*$/im.test(content)) {
-      return { passed: false, reason: `Artifact decision: ${fileName} contains "Result: FAIL"` };
-    }
-    if (/^Result:\s*PASS\s*$/im.test(content)) {
-      return { passed: true };
-    }
+    const result = matchProtocolLine(content, 'Result');
+    if (result === 'FAIL') return { passed: false, reason: `Artifact decision: ${fileName} contains "Result: FAIL"` };
+    if (result === 'PASS') return { passed: true };
     return { passed: true };
   }
   if (fileName.includes('review-report')) {
     const content = readArtifactFromDir(agentDir, fileName);
     if (!content) return { passed: true };
-    if (/^Decision:\s*CHANGES_REQUESTED\s*$/im.test(content)) {
-      return { passed: false, reason: `Artifact decision: ${fileName} contains "Decision: CHANGES_REQUESTED"` };
-    }
-    if (/^Decision:\s*APPROVED\s*$/im.test(content)) {
-      return { passed: true };
-    }
+    const decision = matchProtocolLine(content, 'Decision');
+    if (decision === 'CHANGES_REQUESTED') return { passed: false, reason: `Artifact decision: ${fileName} contains "Decision: CHANGES_REQUESTED"` };
+    if (decision === 'APPROVED') return { passed: true };
     return { passed: true };
   }
   return { passed: true };
@@ -1216,59 +1220,29 @@ function evaluateGateArtifact(agentDir: string): ArtifactDecision {
   const decisionFiles = ['prd-decision.md', 'tech-review.md'];
   for (const file of decisionFiles) {
     const content = readArtifactForDecision(agentDir, file);
-    if (!content) {
-      continue;
-    }
-    if (/^Decision:\s*CHANGES_REQUESTED\s*$/im.test(content)) {
-      return {
-        passed: false,
-        reason: `Artifact decision failed: ${file} contains "Decision: CHANGES_REQUESTED"`,
-      };
-    }
-    if (/^Decision:\s*APPROVED\s*$/im.test(content)) {
-      return { passed: true };
-    }
+    if (!content) continue;
+    const decision = matchProtocolLine(content, 'Decision');
+    if (decision === 'CHANGES_REQUESTED') return { passed: false, reason: `Artifact decision failed: ${file} contains "Decision: CHANGES_REQUESTED"` };
+    if (decision === 'APPROVED') return { passed: true };
   }
   return { passed: true };
 }
 
 function evaluateTesterArtifact(agentDir: string): ArtifactDecision {
   const content = readArtifactForDecision(agentDir, 'test-report.md');
-  if (!content) {
-    return { passed: true };
-  }
-
-  if (/^Result:\s*FAIL\s*$/im.test(content)) {
-    return {
-      passed: false,
-      reason: 'Artifact decision failed: test-report.md contains "Result: FAIL"',
-    };
-  }
-
-  if (/^Result:\s*PASS\s*$/im.test(content)) {
-    return { passed: true };
-  }
-
+  if (!content) return { passed: true };
+  const result = matchProtocolLine(content, 'Result');
+  if (result === 'FAIL') return { passed: false, reason: 'Artifact decision failed: test-report.md contains "Result: FAIL"' };
+  if (result === 'PASS') return { passed: true };
   return { passed: true };
 }
 
 function evaluateReviewerArtifact(agentDir: string): ArtifactDecision {
   const content = readArtifactForDecision(agentDir, 'review-report.md');
-  if (!content) {
-    return { passed: true };
-  }
-
-  if (/^Decision:\s*CHANGES_REQUESTED\s*$/im.test(content)) {
-    return {
-      passed: false,
-      reason: 'Artifact decision failed: review-report.md contains "Decision: CHANGES_REQUESTED"',
-    };
-  }
-
-  if (/^Decision:\s*APPROVED\s*$/im.test(content)) {
-    return { passed: true };
-  }
-
+  if (!content) return { passed: true };
+  const decision = matchProtocolLine(content, 'Decision');
+  if (decision === 'CHANGES_REQUESTED') return { passed: false, reason: 'Artifact decision failed: review-report.md contains "Decision: CHANGES_REQUESTED"' };
+  if (decision === 'APPROVED') return { passed: true };
   return { passed: true };
 }
 

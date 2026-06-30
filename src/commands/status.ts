@@ -158,8 +158,21 @@ function printRunList(runs: Run[]): void {
     console.log(`  Artifacts: ${run.artifactDir}`);
     const wt = getRunWorktreePath(run);
     if (wt) console.log(`  Worktree: ${wt}`);
-    console.log(`  Agents: ${formatAgentSummary(run.sessions)}`);
+    console.log(`  Agents: ${formatAgentSummary(filterSessions(run.sessions, run))}`);
   }
+}
+
+function isHiddenFullWorkflowPending(session: Session, run: Run): boolean {
+  if (!isFullWorkflowRun(run)) return false;
+  if (session.status !== 'pending') return false;
+  if (session.startedAt) return false;
+  const baseNames = ['frontend', 'backend', 'product'];
+  if (!baseNames.includes(session.agentName)) return false;
+  return run.sessions.some((s) =>
+    s.agentName !== session.agentName &&
+    s.agentName.startsWith(session.agentName) &&
+    s.status !== 'pending'
+  );
 }
 
 function printLatestRun(run: Run): void {
@@ -182,12 +195,13 @@ function printLatestRun(run: Run): void {
     console.log(`  Worktree: ${wt.path}${wt.exists ? '' : ' (missing)'}`);
   }
 
-  console.log(`  Agents: ${formatAgentSummary(run.sessions)}`);
+  console.log(`  Agents: ${formatAgentSummary(filterSessions(run.sessions, run))}`);
   if (isRepairRun(run)) console.log(`  Repair: yes`);
 
   console.log('');
   console.log('Sessions:');
   for (const session of run.sessions) {
+    if (isHiddenFullWorkflowPending(session, run)) continue;
     console.log(`  ${session.agentName}`);
     console.log(`    Status: ${session.status}`);
     console.log(`    Duration: ${formatSessionDuration(session)}`);
@@ -288,15 +302,26 @@ function getGateSummary(run: Run) {
 }
 
 function parseDecision(content: string): string {
-  if (/^Decision:\s*CHANGES_REQUESTED\s*$/im.test(content)) return 'CHANGES_REQUESTED';
-  if (/^Decision:\s*APPROVED\s*$/im.test(content)) return 'APPROVED';
+  const v = matchLine(content, 'Decision');
+  if (v === 'CHANGES_REQUESTED' || v === 'APPROVED') return v;
   return 'unknown';
 }
 
 function parseResult(content: string): string {
-  if (/^Result:\s*FAIL\s*$/im.test(content)) return 'FAIL';
-  if (/^Result:\s*PASS\s*$/im.test(content)) return 'PASS';
+  const v = matchLine(content, 'Result');
+  if (v === 'FAIL' || v === 'PASS') return v;
   return 'unknown';
+}
+
+function matchLine(content: string, key: string): string | null {
+  for (const line of content.split('\n')) {
+    const t = line.trim();
+    const bare = new RegExp(`^${key}:\\s*(\\S+)`, 'i').exec(t);
+    if (bare) return bare[1];
+    const bold = new RegExp(`^\\*\\*${key}:\\s*(\\S+)\\*\\*`, 'i').exec(t);
+    if (bold) return bold[1];
+  }
+  return null;
 }
 
 function findLastFailed(run: Run): Session | null {
@@ -344,6 +369,10 @@ function formatAgentSummary(sessions: Session[]): string {
   return [...sessions].sort(compareSessionsForSummary)
     .map((s) => `${s.agentName} ${formatSummaryStatus(s.status)}`)
     .join(', ');
+}
+
+function filterSessions(sessions: Session[], run: Run): Session[] {
+  return sessions.filter((s) => !isHiddenFullWorkflowPending(s, run));
 }
 
 function compareSessionsForSummary(a: Session, b: Session): number {
