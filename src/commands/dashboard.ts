@@ -957,6 +957,9 @@ window.__MOREAGENT_DASHBOARD_RUNTIME__ = ${runtimeJson};
             var found = data.runs.some(function(x){return x.id===currentRunId;});
             if (!found) currentRunId = data.runs[0].id;
             renderMain();
+          } else {
+            currentRunId = '';
+            document.getElementById('main-content').innerHTML = '<div style="text-align:center;padding:80px 32px"><h2 style="color:#8b949e;font-size:20px">No runs found</h2><p style="color:#6e7681;margin-top:12px;font-size:14px">Run a task first: <code style="background:#21262d;padding:2px 8px;border-radius:4px;font-size:13px">moreagent start --once --task "..."</code></p></div>';
           }
           var now = new Date().toISOString();
           if (partialCount > 0) {

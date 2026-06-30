@@ -1815,6 +1815,31 @@ test('V3.1: no-runs serves refreshes to show new runs without crash', function()
   });
 });
 
+test('V3.1: runs cleared to empty refreshes to empty state', function() {
+  return new Promise(async (resolve, reject) => {
+    try {
+      writeSessions(dashDir, { runs: [{ id: 'v31-clear', task: 'will be cleared', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'v31-clear'), sessions: [] }] });
+      const p = startServer(['dashboard', '--serve', '--port', '14350']);
+      const url = await waitForServer(p, 10000);
+
+      // First fetch: has runs
+      const res1 = await httpGet(url + 'data.json');
+      const d1 = JSON.parse(res1.body);
+      assert(d1.runs.length === 1, 'initially 1 run');
+
+      // Clear runs without restarting server
+      writeSessions(dashDir, { runs: [] });
+      const res2 = await httpGet(url + 'data.json');
+      const d2 = JSON.parse(res2.body);
+      assert(d2.runs.length === 0, 'should now have 0 runs');
+      assert(d2.selectedRunId === null, 'selectedRunId should be null');
+
+      p.kill('SIGTERM');
+      resolve();
+    } catch(e) { reject(e); }
+  });
+});
+
 // ============================================================
 // 6. BUILD CHECK
 // ============================================================

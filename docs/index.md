@@ -48,13 +48,15 @@ They are useful for rationale and evolution, but not as the only implementation 
 - [V2.2 Dashboard Resilience Tech Plan](v2.2-dashboard-resilience-tech-plan.md)
 - [V2.3 Dashboard Open PRD](v2.3-dashboard-open-prd.md)
 - [V2.3 Dashboard Open Tech Plan](v2.3-dashboard-open-tech-plan.md)
+- [V3.0 Dashboard Serve PRD](v3.0-dashboard-serve-prd.md)
+- [V3.0 Dashboard Serve Tech Plan](v3.0-dashboard-serve-tech-plan.md)
 
 ## Future Design Docs
 
 These documents describe pending future work, not current shipped behavior.
 
-- [V3.0 Dashboard Serve PRD](v3.0-dashboard-serve-prd.md)
-- [V3.0 Dashboard Serve Tech Plan](v3.0-dashboard-serve-tech-plan.md)
+- [V3.1 Dashboard Serve Usability PRD](v3.1-dashboard-serve-usability-prd.md)
+- [V3.1 Dashboard Serve Usability Tech Plan](v3.1-dashboard-serve-usability-tech-plan.md)
 
 ## Legacy Product / Planning References
 
