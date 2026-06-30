@@ -813,7 +813,7 @@ async function runFailureAnalysis(
   if (!match) return { owner: null };
 
   const valid = ['frontend', 'backend', 'tester', 'product', 'tech-plan', 'unknown'];
-  return { owner: valid.includes(match[1]) ? match[1] : null };
+  return { owner: valid.includes(match) ? match : null };
 }
 
 function evaluateArtifactDecisionForFile(agentDir: string, fileName: string): ArtifactDecision {

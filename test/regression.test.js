@@ -318,27 +318,59 @@ test('full workflow: frontend with startedAt NOT hidden', () => {
 });
 
 // ============================================================
-// 3. MERGE (dry-run + apply)
+// 3. MERGE (dry-run + apply) — real worktree required
 // ============================================================
 
 console.log('\n3. Merge (dry-run + apply)');
 console.log('==========================');
 
-test('merge dry-run on dirty main: does not crash', () => {
-  const r = runCliIn(testDir, ['merge', '--latest']);
-  // Dry-run should not throw; whether it shows run info depends on dir state
-  assert(r.status === 0 || r.stderr.includes('No runs found') || r.stderr.includes('has no worktree'),
-    `merge dry-run crashed. status=${r.status} stderr=${r.stderr.slice(0, 200)}`);
+function makeRealWorktree(dir, runId) {
+  const wtPath = path.join(dir, '.moreagent', 'worktrees', `agent-${runId}`);
+  execSync(`git worktree add "${wtPath}"`, { cwd: dir, stdio: 'pipe' });
+  return wtPath;
+}
+
+let mergeDir;
+let mergeRunId = 'merge-run';
+let mergeWtPath;
+
+test('setup merge test dir with real worktree', () => {
+  mergeDir = initTestDir();
+  // Need a second commit for worktree baseline
+  fs.writeFileSync(path.join(mergeDir, 'README.md'), '# test');
+  execSync('git add -A && git commit -m "second commit"', { cwd: mergeDir, stdio: 'pipe' });
+  mergeWtPath = makeRealWorktree(mergeDir, mergeRunId);
+  assert(fs.existsSync(mergeWtPath), 'worktree should exist');
 });
 
-test('merge --apply on dirty main: rejects with error', () => {
-  // Create a dirty file in main project
-  const dirtyFile = path.join(testDir, '.moreagent', 'dirty-test');
-  fs.writeFileSync(dirtyFile, 'test');
-  const r = runCliIn(testDir, ['merge', '--run', 'test-run', '--apply']);
-  // Should fail because either run has no worktree or main is dirty
-  assert(r.status !== 0, 'merge --apply should reject dirty main');
-  fs.unlinkSync(dirtyFile);
+test('merge dry-run on dirty main: shows Run/Worktree/Branch', () => {
+  // Make main dirty by writing a MoreAgent state file
+  fs.writeFileSync(path.join(mergeDir, '.moreagent', 'merge-dirty-test'), 'dirty');
+  writeSessions(mergeDir, {
+    runs: [{
+      id: mergeRunId, task: 'test merge', status: 'completed',
+      createdAt: '2024-01-01T00:00:00Z',
+      artifactDir: path.join(mergeDir, '.moreagent', 'runs', mergeRunId),
+      sessions: [
+        { id: 'imp-1', agentName: 'implementer', status: 'completed',
+          artifactDir: '/tmp/imp', startedAt: '2024-01-01T00:00:00Z', completedAt: '2024-01-01T00:01:00Z',
+          worktreePath: mergeWtPath, runId: mergeRunId },
+      ],
+    }]
+  });
+  const r = runCliIn(mergeDir, ['merge', '--run', mergeRunId]);
+  assert(r.status === 0, `dry-run should exit 0, got ${r.status}`);
+  assert(r.stdout.includes('Run:'), 'dry-run should show Run info');
+  assert(r.stdout.includes('Worktree:'), 'dry-run should show Worktree path');
+  assert(r.stdout.includes('Branch:'), 'dry-run should show Branch');
+});
+
+test('merge --apply on dirty main: rejects with clean message', () => {
+  // Main is already dirty from previous test
+  const r = runCliIn(mergeDir, ['merge', '--run', mergeRunId, '--apply']);
+  assert(r.status !== 0, '--apply should reject dirty main');
+  assert(r.stderr.includes('not clean') || r.stdout.includes('not clean') || r.stderr.includes('Main project'),
+    `apply should mention dirty main. stderr=${r.stderr.slice(0, 200)}`);
 });
 
 // ============================================================
