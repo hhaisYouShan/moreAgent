@@ -6,4 +6,3 @@ node_modules/
 *.d.ts
 *.d.ts.map
 dist/
-review-packets/
