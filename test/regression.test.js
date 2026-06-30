@@ -515,7 +515,18 @@ console.log('\n5. Workflow Report (V1.9)');
 console.log('========================');
 
 let reportDir;
-test('Report: init test dir', () => { reportDir = initTestDir(); });
+let reportWtPath;
+
+test('Report: init test dir with real worktree', () => {
+  reportDir = initTestDir();
+  // Create a second commit for worktree baseline
+  fs.writeFileSync(path.join(reportDir, 'README.md'), '# test');
+  execSync('git add -A && git commit -m "second" --allow-empty', { cwd: reportDir, stdio: 'pipe' });
+  // Create a real worktree
+  reportWtPath = path.join(reportDir, '.moreagent', 'worktrees', 'agent-rpt-wt');
+  execSync(`git worktree add "${reportWtPath}"`, { cwd: reportDir, stdio: 'pipe' });
+  assert(fs.existsSync(reportWtPath), 'report worktree should exist');
+});
 
 function writeArtifactForReport(dir, runId, sessionName, fileName, content) {
   const d = path.join(dir, '.moreagent', 'runs', runId, sessionName);
@@ -523,54 +534,67 @@ function writeArtifactForReport(dir, runId, sessionName, fileName, content) {
   fs.writeFileSync(path.join(d, fileName), content);
 }
 
-test('Report: completed + PASS/APPROVED + clean → MERGE_READY', () => {
-  const runId = 'report-good';
-  const sessions = [
-    { id: 'a-1', agentName: 'tester', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'tester'), startedAt: '2024-01-01T00:00:00Z', runId },
-    { id: 'r-1', agentName: 'reviewer', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'reviewer'), startedAt: '2024-01-01T00:00:00Z', worktreePath: path.join(reportDir, '.moreagent', 'worktrees', `agent-${runId}`), runId },
-  ];
+test('Report: MERGE_READY (PASS/APPROVED + real worktree)', () => {
+  const runId = 'report-merge-ready';
   writeArtifactForReport(reportDir, runId, 'tester', 'test-report.md', 'Result: PASS\n\nOK');
   writeArtifactForReport(reportDir, runId, 'reviewer', 'review-report.md', 'Decision: APPROVED\n\nOK');
-  writeSessions(reportDir, { runs: [{ id: runId, task: 'good run', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId), sessions }] });
+  writeSessions(reportDir, { runs: [{ id: runId, task: 'merge ready', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId), sessions: [
+    { id: 't-1', agentName: 'tester', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'tester'), startedAt: '2024-01-01T00:00:00Z', completedAt: '2024-01-01T00:00:30Z', runId },
+    { id: 'r-1', agentName: 'reviewer', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'reviewer'), startedAt: '2024-01-01T00:00:00Z', completedAt: '2024-01-01T00:00:30Z', worktreePath: reportWtPath, runId },
+  ] }] });
   const r = runCliIn(reportDir, ['report', '--run', runId, '--json']);
   const data = JSON.parse(r.stdout);
-  assert(data.report.decision.overallStatus === 'PASSED',
-    `got ${data.report.decision.overallStatus}, gates: test=${data.report.quality.test} review=${data.report.quality.review}`);
-  // recommendation depends on worktree/main state; just check it's one of the valid values
-  assert(['MERGE_READY', 'BLOCKED', 'NEEDS_REPAIR', 'NEEDS_REVIEW', 'RUNNING', 'UNKNOWN'].includes(data.report.decision.recommendation),
-    `invalid recommendation: ${data.report.decision.recommendation}`);
+  assert(data.report.decision.overallStatus === 'PASSED', `got ${data.report.decision.overallStatus}`);
+  assert(data.report.merge.canMerge === true, 'canMerge should be true');
+  assert(data.report.worktree.exists === true, 'worktree should exist');
+  assert(['MERGE_READY', 'BLOCKED'].includes(data.report.decision.recommendation),
+    `recommendation should be MERGE_READY or BLOCKED, got ${data.report.decision.recommendation}`);
 });
 
-test('Report: completed + test unknown → PARTIAL', () => {
-  const runId = 'report-partial';
-  writeArtifactForReport(reportDir, runId, 'tester', 'test-report.md', '# Report\n\nNo result line.');
-  writeArtifactForReport(reportDir, runId, 'reviewer', 'review-report.md', 'Decision: APPROVED');
-  writeSessions(reportDir, { runs: [{ id: runId, task: 'partial run', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId), sessions: [
+test('Report: BLOCKED (PASS/APPROVED + real worktree + main dirty)', () => {
+  const runId = 'report-blocked';
+  // Make main dirty
+  fs.writeFileSync(path.join(reportDir, '.moreagent', 'dirty-marker'), 'x');
+  writeArtifactForReport(reportDir, runId, 'tester', 'test-report.md', 'Result: PASS\n\nOK');
+  writeArtifactForReport(reportDir, runId, 'reviewer', 'review-report.md', 'Decision: APPROVED\n\nOK');
+  writeSessions(reportDir, { runs: [{ id: runId, task: 'blocked run', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId), sessions: [
     { id: 't-1', agentName: 'tester', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'tester'), startedAt: '2024-01-01T00:00:00Z', runId },
-    { id: 'r-1', agentName: 'reviewer', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'reviewer'), startedAt: '2024-01-01T00:00:00Z', runId },
+    { id: 'r-1', agentName: 'reviewer', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'reviewer'), startedAt: '2024-01-01T00:00:00Z', worktreePath: reportWtPath, runId },
   ] }] });
   const r = runCliIn(reportDir, ['report', '--run', runId, '--json']);
   const data = JSON.parse(r.stdout);
-  assert(data.report.decision.overallStatus === 'PARTIAL', `got ${data.report.decision.overallStatus}`);
-  assert(data.report.decision.recommendation === 'NEEDS_REVIEW', `got ${data.report.decision.recommendation}`);
+  assert(data.report.decision.overallStatus === 'PASSED', `got ${data.report.decision.overallStatus}`);
+  assert(data.report.decision.recommendation === 'BLOCKED', `got ${data.report.decision.recommendation}`);
+  assert(data.report.merge.mainClean === false, 'mainClean should be false');
+  // Clean up
+  try { fs.unlinkSync(path.join(reportDir, '.moreagent', 'dirty-marker')); } catch {}
 });
 
-test('Report: running → RUNNING', () => {
-  const runId = 'report-running';
-  writeSessions(reportDir, { runs: [{ id: runId, task: 'running run', status: 'running', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId), workflow: { profile: 'full', completedPhases: ['brain'] }, sessions: [
-    { id: 'b-1', agentName: 'brain', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'brain'), startedAt: '2024-01-01T00:00:00Z', runId },
+test('Report: NEEDS_REPAIR (failed + canResume)', () => {
+  const runId = 'report-needs-repair';
+  writeSessions(reportDir, { runs: [{ id: runId, task: 'repair run', status: 'failed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId), workflow: { profile: 'full', completedPhases: ['brain', 'prd', 'prd-review'], failedPhase: 'prd-gate' }, sessions: [
+    { id: 'b-1', agentName: 'brain', status: 'completed', artifactDir: '/tmp/b', startedAt: '2024-01-01T00:00:00Z', runId },
+    { id: 'p-1', agentName: 'product', status: 'completed', artifactDir: '/tmp/p', startedAt: '2024-01-01T00:00:00Z', runId },
+    { id: 'fpr-1', agentName: 'frontend-prd-review', status: 'completed', artifactDir: '/tmp/fpr', startedAt: '2024-01-01T00:00:00Z', runId },
   ] }] });
   const r = runCliIn(reportDir, ['report', '--run', runId, '--json']);
   const data = JSON.parse(r.stdout);
-  assert(data.report.decision.overallStatus === 'RUNNING', `got ${data.report.decision.overallStatus}`);
-  assert(data.report.decision.recommendation === 'RUNNING');
+  assert(data.report.decision.overallStatus === 'FAILED', `got ${data.report.decision.overallStatus}`);
+  assert(data.report.decision.canResume === true, 'canResume should be true');
+  assert(data.report.decision.recommendation === 'NEEDS_REPAIR', `got ${data.report.decision.recommendation}`);
 });
 
-test('Report: not found → RUN_NOT_FOUND', () => {
-  const r = runCliIn(reportDir, ['report', '--run', 'does-not-exist', '--json']);
-  assert(r.status !== 0);
+test('Report: repair sessions counted', () => {
+  const runId = 'report-repair-rounds';
+  writeSessions(reportDir, { runs: [{ id: runId, task: 'repair run', status: 'failed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId), sessions: [
+    { id: 'r1-1', agentName: 'repair-1-implementer', status: 'completed', artifactDir: '/tmp/r1', startedAt: '2024-01-01T00:00:00Z', runId },
+    { id: 'r1-2', agentName: 'repair-1-tester', status: 'completed', artifactDir: '/tmp/r2', startedAt: '2024-01-01T00:00:00Z', runId },
+    { id: 'r2-1', agentName: 'repair-2-implementer', status: 'completed', artifactDir: '/tmp/r3', startedAt: '2024-01-01T00:00:00Z', runId },
+  ] }] });
+  const r = runCliIn(reportDir, ['report', '--run', runId, '--json']);
   const data = JSON.parse(r.stdout);
-  assert(data.error.code === 'RUN_NOT_FOUND', `got ${data.error.code}`);
+  assert(data.report.quality.repairCount === 3, `repairCount=${data.report.quality.repairCount}`);
+  assert(data.report.quality.repairRounds > 0, `repairRounds should be > 0, got ${data.report.quality.repairRounds}`);
 });
 
 test('Report: text output is non-empty', () => {

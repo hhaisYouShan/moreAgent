@@ -221,8 +221,17 @@ function countRepairSessions(run: Run): number {
   }).length;
 }
 
-function countRepairRounds(_run: Run): number {
-  return 0; // simplified
+function countRepairRounds(run: Run): number {
+  let maxRound = 0;
+  for (const s of run.sessions) {
+    const n = s.agentName;
+    const match = n.match(/^(?:repair|retry|revision)-(\d+)|failure-analysis-\w+-(\d+)$/);
+    if (match) {
+      const r = parseInt(match[1] || match[2], 10);
+      if (r > maxRound) maxRound = r;
+    }
+  }
+  return maxRound > 0 || countRepairSessions(run) > 0 ? Math.max(maxRound, 1) : 0;
 }
 
 function checkCanResume(run: Run): { ok: boolean; reason: string } {

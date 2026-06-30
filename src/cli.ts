@@ -45,6 +45,8 @@ Commands:
   inspect                   Show latest run overview
   inspect --agent <name>    Show an agent's primary artifact
   inspect --run <id>        Show a specific run
+  report --latest           Show workflow report for latest run
+  report --run <id>         Show workflow report for specific run
   clean                     Clean runs or worktrees
   sessions list             List agent runtime session mappings
   sessions reset --agent <n> Reset one agent's runtime session

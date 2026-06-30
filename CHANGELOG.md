@@ -13,7 +13,9 @@
   - MERGE_READY requires: PASSED + canMerge + worktree.exists + mainClean
 - New `src/commands/report.ts`: all helpers inline, no exports from status.ts
 - New `src/output/report.ts`: ReportModel type, printReportText
-- 5 report regression tests
+- 8 report regression tests (MERGE_READY, BLOCKED, NEEDS_REPAIR, PARTIAL, RUNNING, repairRounds, not found, text)
+- computeDecision gate checks limited to full workflow runs (MVP runs skip prdGate/techGate)
+- countRepairRounds implements real round detection from session names
 
 ### Design
 - `buildReport()` reads directly from `Run`, artifact markdown files, and `git status`
