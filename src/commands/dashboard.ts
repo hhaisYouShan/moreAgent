@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as http from 'http';
 import { spawnSync } from 'child_process';
 
 export interface DashboardOptions {
@@ -7,6 +8,10 @@ export interface DashboardOptions {
   limit?: number;
   output?: string;
   open?: boolean;
+  serve?: boolean;
+  watch?: boolean;
+  port?: number;
+  host?: string;
 }
 
 interface DashboardError {
@@ -32,8 +37,15 @@ interface DashboardModel {
 
 const DEFAULT_LIMIT = 10;
 const DEFAULT_OUTPUT = '.moreagent/dashboard/index.html';
+const DEFAULT_DASHBOARD_HOST = '127.0.0.1';
+const DEFAULT_DASHBOARD_PORT = 4317;
 
 export function dashboardCommand(options: DashboardOptions): void {
+  if (options.serve) {
+    startServeMode(options);
+    return;
+  }
+
   const limit = Math.max(1, options.limit ?? DEFAULT_LIMIT);
   const outputPath = options.output ?? path.resolve(DEFAULT_OUTPUT);
 
@@ -56,6 +68,108 @@ export function dashboardCommand(options: DashboardOptions): void {
       console.log(`Dashboard was still generated at ${outputPath}`);
     }
   }
+}
+
+function startServeMode(options: DashboardOptions): void {
+  if (options.output) {
+    console.log('--output only applies to static dashboard generation');
+  }
+  const limit = Math.max(1, options.limit ?? DEFAULT_LIMIT);
+  const host = options.host ?? DEFAULT_DASHBOARD_HOST;
+  const port = options.port ?? DEFAULT_DASHBOARD_PORT;
+
+  const initialModel = buildDashboardModel(options.run, limit);
+  if (!initialModel) {
+    console.error('Failed to build initial dashboard model');
+    process.exit(1);
+  }
+
+  const runtimeConfig = {
+    serveMode: true,
+    watchEnabled: options.watch === true,
+    dataEndpoint: `/data.json${options.run ? '?run=' + encodeURIComponent(options.run) : ''}${options.limit ? (options.run ? '&' : '?') + 'limit=' + options.limit : ''}`,
+    refreshIntervalMs: 3000,
+  };
+
+  const server = http.createServer((req, res) => {
+    const url = (req.url || '/').split('?')[0];
+
+    if (url === '/') {
+      const model = buildDashboardModel(options.run, limit);
+      if (!model) {
+        res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end('<h1>Failed to build dashboard</h1>');
+        return;
+      }
+      const html = renderDashboardHtml(model, {
+        serveMode: true,
+        watchEnabled: options.watch === true,
+        dataEndpoint: runtimeConfig.dataEndpoint,
+        refreshIntervalMs: 3000,
+      });
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+      return;
+    }
+
+    if (url === '/data.json') {
+      const model = buildDashboardModel(options.run, limit);
+      if (!model) {
+        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: { code: 'INTERNAL_ERROR', message: 'Failed to build dashboard model' } }));
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(model));
+      return;
+    }
+
+    if (url === '/health') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: true, host, port, watch: options.watch === true, generatedAt: new Date().toISOString() }));
+      return;
+    }
+
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Not found');
+  });
+
+  server.on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`Port ${port} is already in use. Try: moreagent dashboard --serve --port ${port + 1}`);
+    } else {
+      console.error(`Server error: ${err.message}`);
+    }
+    process.exit(1);
+  });
+
+  server.listen(port, host, () => {
+    const url = `http://${host}:${port}/`;
+    console.log(`Dashboard server running at ${url}`);
+    console.log('Press Ctrl+C to stop');
+
+    if (options.open) {
+      const result = openInDefaultBrowser(`http://${host}:${port}/`);
+      if (result.ok) {
+        console.log('Opened dashboard in default browser');
+      } else {
+        console.log(`Open failed: ${result.message}`);
+      }
+    }
+  });
+
+  process.on('SIGINT', () => {
+    server.close(() => {
+      console.log('\nDashboard server stopped');
+      process.exit(0);
+    });
+  });
+  process.on('SIGTERM', () => {
+    server.close(() => {
+      console.log('\nDashboard server stopped');
+      process.exit(0);
+    });
+  });
 }
 
 function getCliPath(): string {
@@ -188,10 +302,23 @@ function serializeJsonForScript(value: any): string {
     .replace(/\u2029/g, '\\u2029');
 }
 
-function renderDashboardHtml(model: DashboardModel): string {
+interface RenderOptions {
+  serveMode?: boolean;
+  watchEnabled?: boolean;
+  dataEndpoint?: string;
+  refreshIntervalMs?: number;
+}
+
+function renderDashboardHtml(model: DashboardModel, renderOpts?: RenderOptions): string {
   const dataJson = serializeJsonForScript(model);
   const selectedId = model.selectedRunId || (model.runs[0]?.id ?? '');
   const isEmpty = model.runs.length === 0;
+  const runtimeJson = JSON.stringify({
+    serveMode: renderOpts?.serveMode || false,
+    watchEnabled: renderOpts?.watchEnabled || false,
+    dataEndpoint: renderOpts?.dataEndpoint || '/data.json',
+    refreshIntervalMs: renderOpts?.refreshIntervalMs || 0,
+  });
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -297,6 +424,7 @@ td{padding:6px 8px;border-bottom:1px solid #21262d}
 
 <script>
 window.__MOREAGENT_DASHBOARD_DATA__ = ${dataJson};
+window.__MOREAGENT_DASHBOARD_RUNTIME__ = ${runtimeJson};
 
 (function(){
   var D = window.__MOREAGENT_DASHBOARD_DATA__;
@@ -723,6 +851,56 @@ window.__MOREAGENT_DASHBOARD_DATA__ = ${dataJson};
 
   renderSidebar();
   renderMain();
+
+  // -- serve mode runtime --
+  var RT = window.__MOREAGENT_DASHBOARD_RUNTIME__ || {};
+  if (RT.serveMode) {
+    var refreshBtn = document.createElement('div');
+    refreshBtn.style.cssText = 'position:fixed;top:8px;right:16px;background:#21262d;border:1px solid #30363d;color:#58a6ff;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:12px;z-index:1000';
+    refreshBtn.textContent = '\u21bb Refresh data';
+    refreshBtn.onclick = function(){
+      refreshBtn.textContent = '\u21bb Refreshing...';
+      fetchDashboardData();
+    };
+    document.body.appendChild(refreshBtn);
+
+    if (RT.watchEnabled && RT.dataEndpoint) {
+      setInterval(function(){ fetchDashboardData(); }, RT.refreshIntervalMs || 3000);
+    }
+
+    function fetchDashboardData() {
+      fetch(RT.dataEndpoint)
+        .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+        .then(function(data){
+          if (data.error) { updateRefreshStatus('\u26a0 Refresh failed: '+(data.error.message||'error')); return; }
+          window.__MOREAGENT_DASHBOARD_DATA__ = data;
+          D = data;
+          renderSidebar();
+          if (currentRunId && data.runs.length > 0) {
+            var found = data.runs.some(function(x){return x.id===currentRunId;});
+            if (!found) currentRunId = data.runs[0].id;
+            renderMain();
+          }
+          updateRefreshStatus('\u2713 Refreshed ' + new Date().toLocaleTimeString());
+          refreshBtn.textContent = '\u21bb Refresh data';
+        })
+        .catch(function(e){
+          updateRefreshStatus('\u26a0 Refresh failed: '+(e.message||'error'));
+          refreshBtn.textContent = '\u21bb Refresh data';
+        });
+    }
+
+    function updateRefreshStatus(msg) {
+      var el = document.getElementById('refresh-status');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'refresh-status';
+        el.style.cssText = 'position:fixed;top:36px;right:16px;font-size:10px;color:#8b949e;z-index:1000';
+        document.body.appendChild(el);
+      }
+      el.textContent = msg;
+    }
+  }
 })();
 </script>
 </body>

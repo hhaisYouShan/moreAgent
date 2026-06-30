@@ -48,7 +48,7 @@ runtime:
 
 ### 3. Run a Task
 
-Run the full 4-agent pipeline (architect → implementer → tester → reviewer):
+Run the default 4-agent MVP pipeline (architect → implementer → tester → reviewer):
 
 ```bash
 moreagent start --once --task "add a dark mode toggle to settings"

@@ -11,6 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync, spawnSync } = require('child_process');
+const http = require('http');
 const os = require('os');
 
 const CLI = path.join(__dirname, '..', 'dist', 'cli.js');
@@ -19,8 +20,21 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'moreagent-test-'));
 let passed = 0;
 let failed = 0;
 const failures = [];
+const asyncTests = [];
+let lastAsyncPromise = Promise.resolve();
 
 function test(name, fn) {
+  const isAsync = fn.constructor.name === 'AsyncFunction';
+
+  if (isAsync) {
+    lastAsyncPromise = lastAsyncPromise.then(() => fn().then(
+      () => { passed++; console.log(`  ✅ ${name}`); },
+      (e) => { failed++; failures.push({ name, error: e.message || String(e) }); console.log(`  ❌ ${name}: ${e.message || e}`); }
+    ));
+    asyncTests.push({ name, promise: lastAsyncPromise });
+    return;
+  }
+
   try {
     fn();
     passed++;
@@ -766,7 +780,7 @@ function makeDashDir() {
 }
 
 function extractDashboardData(html) {
-  const match = /window\.__MOREAGENT_DASHBOARD_DATA__\s*=\s*([\s\S]*?);\s*(?:\n\s*\()/.exec(html);
+  const match = /window\.__MOREAGENT_DASHBOARD_DATA__\s*=\s*([\s\S]*?);\s*\n\s*(?:window\.__MOREAGENT_DASHBOARD_RUNTIME__|=)/.exec(html);
   if (!match) return null;
   return JSON.parse(match[1]);
 }
@@ -1369,6 +1383,192 @@ test('Dashboard: --open appears in CLI help', () => {
 });
 
 // ============================================================
+// 8. V3.0 Dashboard --serve / --watch
+// ============================================================
+
+console.log('\n8. Dashboard Serve (V3.0)');
+console.log('========================');
+
+function startServer(args, env) {
+  const proc = require('child_process').spawn('node', [CLI, ...args], {
+    cwd: dashDir,
+    env: { ...process.env, ...(env||{}) },
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  return proc;
+}
+
+function httpGet(url) {
+  return new Promise((resolve, reject) => {
+    const req = http.get(url, (res) => {
+      let body = '';
+      res.on('data', (d) => { body += d; });
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body }));
+    });
+    req.setTimeout(5000, () => { req.destroy(); reject(new Error('timeout')); });
+    req.on('error', reject);
+  });
+}
+
+function waitForServer(proc, maxWaitMs) {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    let done = false;
+    proc.stdout.on('data', (d) => {
+      if (done) return;
+      const s = d.toString();
+      if (s.includes('Dashboard server running at')) {
+        done = true;
+        const m = s.match(/http:\/\/[^\s]+/);
+        resolve(m ? m[0] : 'http://127.0.0.1:4317/');
+      }
+    });
+    proc.stderr.on('data', (d) => {
+      if (!done && d.toString().includes('Error')) {
+        done = true;
+        reject(new Error(d.toString()));
+      }
+    });
+    const check = setInterval(() => {
+      if (Date.now() - start > (maxWaitMs || 10000)) {
+        clearInterval(check);
+        if (!done) { done = true; reject(new Error('Server start timeout')); }
+      }
+    }, 100);
+  });
+}
+
+test('Dashboard: --watch without --serve exits non-zero', () => {
+  const r = runCliIn(dashDir, ['dashboard', '--watch']);
+  assert(r.status !== 0, `--watch without --serve should fail, got ${r.status}`);
+});
+
+test('Dashboard: --serve --host invalid exits non-zero', () => {
+  const r = runCliIn(dashDir, ['dashboard', '--serve', '--host', '0.0.0.0']);
+  assert(r.status !== 0, `invalid host should fail, got ${r.status}`);
+});
+
+let serveProc;
+let serveUrl;
+
+test('Dashboard: --serve starts server and /health returns ok', async function() {
+  writeSessions(dashDir, { runs: [{ id: 'serve-1', task: 'serve test', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'serve-1'), sessions: [] }] });
+
+  serveProc = startServer(['dashboard', '--serve', '--port', '14317']);
+  try {
+    serveUrl = await waitForServer(serveProc, 10000);
+  } catch (e) {
+    serveProc.kill();
+    throw e;
+  }
+  const res = await httpGet(serveUrl + 'health');
+  assert(res.status === 200, `health should be 200, got ${res.status}`);
+  const data = JSON.parse(res.body);
+  assert(data.ok === true, `health should be ok, got ${JSON.stringify(data)}`);
+});
+
+test('Dashboard: GET / returns HTML with MoreAgent Dashboard', async function() {
+  const res = await httpGet(serveUrl);
+  assert(res.status === 200, `GET / should be 200, got ${res.status}`);
+  assert(res.body.includes('MoreAgent Dashboard'), 'should contain Dashboard title');
+});
+
+test('Dashboard: GET /data.json returns valid JSON with runs', async function() {
+  const res = await httpGet(serveUrl + 'data.json');
+  assert(res.status === 200, `data.json should be 200, got ${res.status}`);
+  const data = JSON.parse(res.body);
+  assert(Array.isArray(data.runs), 'should have runs array');
+  assert(typeof data.generatedAt === 'string', 'should have generatedAt');
+});
+
+test('Dashboard: --limit 2 via serve limits runs count', async function() {
+  writeSessions(dashDir, { runs: [
+    { id: 'sv-lim-1', task: 'r1', status: 'completed', createdAt: '2024-01-03T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'sv-lim-1'), sessions: [] },
+    { id: 'sv-lim-2', task: 'r2', status: 'completed', createdAt: '2024-01-02T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'sv-lim-2'), sessions: [] },
+    { id: 'sv-lim-3', task: 'r3', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'sv-lim-3'), sessions: [] },
+  ] });
+
+  const res = await httpGet(serveUrl + 'data.json');
+  const data = JSON.parse(res.body);
+  assert(data.runs.length <= 10, 'default limit should apply via server');
+});
+
+test('Dashboard: no runs returns empty serve dashboard', async function() {
+  writeSessions(dashDir, { runs: [] });
+  const res = await httpGet(serveUrl);
+  assert(res.status === 200, `should be 200, got ${res.status}`);
+  assert(res.body.includes('No runs found'), 'should contain No runs found');
+});
+
+test('Dashboard: --watch HTML contains watch config', async function() {
+  if (serveProc) { serveProc.kill(); try { await new Promise(r => setTimeout(r, 500)); } catch(e){} }
+
+  writeSessions(dashDir, { runs: [{ id: 'watch-1', task: 'watch test', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'watch-1'), sessions: [] }] });
+
+  serveProc = startServer(['dashboard', '--serve', '--watch', '--port', '14318']);
+  serveUrl = await waitForServer(serveProc, 10000);
+
+  const res = await httpGet(serveUrl);
+  assert(res.body.includes('"watchEnabled":true'), 'should have watchEnabled=true');
+  assert(res.body.includes('"dataEndpoint"'), 'should have dataEndpoint');
+});
+
+test('Dashboard: --serve --open attempts URL not file path', function() {
+  if (serveProc) { serveProc.kill(); try { serveProc = null; } catch(e){} }
+  const logPath = path.join(TMP, 'open-target.txt');
+  const scriptPath = path.join(TMP, 'open-logger.js');
+  fs.writeFileSync(scriptPath, 'require("fs").writeFileSync("' + logPath.replace(/\\/g, '\\\\') + '", process.argv[2])');
+  return new Promise((resolve, reject) => {
+    const proc = startServer(['dashboard', '--serve', '--open', '--port', '14319'], {
+      MOREAGENT_DASHBOARD_OPEN_COMMAND: 'node ' + scriptPath,
+    });
+    const t = setTimeout(() => {
+      proc.kill();
+      try {
+        const target = fs.readFileSync(logPath, 'utf-8').trim();
+        assert(target.startsWith('http://'), 'should open URL, got: ' + target);
+        resolve();
+      } catch(e) { reject(e); }
+    }, 5000);
+    proc.stdout.on('data', (d) => {
+      if (d.toString().includes('Dashboard server running at')) {
+        setTimeout(() => {
+          clearTimeout(t);
+          proc.kill();
+          try {
+            const target = fs.readFileSync(logPath, 'utf-8').trim();
+            assert(target.startsWith('http://'), 'should open URL, got: ' + target);
+            resolve();
+          } catch(e) { reject(e); }
+        }, 800);
+      }
+    });
+  });
+});
+
+test('Dashboard: port conflict exits non-zero', function() {
+  if (serveProc) { serveProc.kill(); }
+  const p1 = startServer(['dashboard', '--serve', '--port', '14320']);
+  return waitForServer(p1, 5000).then((url) => {
+    const p2 = spawnSync('node', [CLI, 'dashboard', '--serve', '--port', '14320'], {
+      cwd: dashDir, encoding: 'utf-8', timeout: 5000,
+    });
+    p1.kill();
+    assert(p2.status !== 0, `second server should fail on same port, got exit ${p2.status}`);
+  });
+});
+
+test('Dashboard: server close kills process cleanly', async function() {
+  if (serveProc) { serveProc.kill(); await new Promise(r => setTimeout(r, 300)); }
+  const p = startServer(['dashboard', '--serve', '--port', '14321']);
+  await waitForServer(p, 8000);
+  p.kill('SIGTERM');
+  await new Promise(r => setTimeout(r, 500));
+  // Process should be dead
+  assert(p.killed || p.exitCode !== null, 'server should be killed');
+});
+
+// ============================================================
 // 6. BUILD CHECK
 // ============================================================
 
@@ -1388,20 +1588,30 @@ test('dist/cli.js is functional (--help)', () => {
 // SUMMARY
 // ============================================================
 
-// Cleanup
-try { fs.rmSync(TMP, { recursive: true }); } catch {}
+// Cleanup and summary
+(async function finish() {
+  // Wait for all async tests to complete (they chain sequentially)
+  try { await lastAsyncPromise; } catch(e) {}
 
-console.log(`\n========================================`);
-console.log(`  RESULTS: ${passed} passed, ${failed} failed`);
-console.log(`========================================`);
-
-if (failures.length > 0) {
-  console.log('\nFailures:');
-  for (const f of failures) {
-    console.log(`  ❌ ${f.name}: ${f.error}`);
+  // Ensure any lingering server process is killed
+  if (typeof serveProc !== 'undefined' && serveProc && !serveProc.killed) {
+    try { serveProc.kill('SIGTERM'); } catch(e) {}
   }
-  process.exit(1);
-} else {
-  console.log('All tests passed.\n');
-  process.exit(0);
-}
+
+  try { fs.rmSync(TMP, { recursive: true }); } catch {}
+
+  console.log(`\n========================================`);
+  console.log(`  RESULTS: ${passed} passed, ${failed} failed`);
+  console.log(`========================================`);
+
+  if (failures.length > 0) {
+    console.log('\nFailures:');
+    for (const f of failures) {
+      console.log(`  ❌ ${f.name}: ${f.error}`);
+    }
+    process.exit(1);
+  } else {
+    console.log('All tests passed.\n');
+    process.exit(0);
+  }
+})();

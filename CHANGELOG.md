@@ -1,5 +1,20 @@
 # Changelog
 
+## V3.0 (2026-06-30)
+
+### Added — Dashboard `--serve` / `--watch`
+- **`moreagent dashboard --serve`**: local HTTP server using Node.js built-in `http` module
+- **`--serve --watch`**: auto-refresh with 3000ms polling of `/data.json`
+- **`--serve --open`**: starts server then opens `http://host:port/` in browser
+- **Configurable**: `--host` (127.0.0.1/localhost), `--port` (default 4317)
+- **3 routes**: `GET /` (dynamic HTML), `GET /data.json`, `GET /health`
+- `--run + --serve`: selected run persists across refreshes
+- **Browser runtime**: `window.__MOREAGENT_DASHBOARD_RUNTIME__`
+- Port conflict exits non-zero; `--watch` without `--serve` rejected
+- `--output` in serve mode prints advisory (ignored)
+- Server lifecycle: `SIGINT`/`SIGTERM` clean shutdown
+- 11 new V3.0 tests
+
 ## V2.4 (2026-06-30)
 
 ### Added — Documentation Update

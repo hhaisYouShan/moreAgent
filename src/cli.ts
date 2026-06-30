@@ -50,6 +50,8 @@ Commands:
   report --run <id>         Show workflow report for specific run
   dashboard                 Generate static HTML dashboard
   dashboard --run <id>      Generate dashboard with specific run selected
+  dashboard --serve         Start local HTTP dashboard server
+  dashboard --serve --watch Start server with auto-refresh
   dashboard --open          Generate and open in default browser
   clean                     Clean runs or worktrees
   sessions list             List agent runtime session mappings
@@ -92,6 +94,10 @@ Examples:
   moreagent dashboard --limit 5
   moreagent dashboard --output /tmp/dash.html
   moreagent dashboard --open
+  moreagent dashboard --serve
+  moreagent dashboard --serve --watch
+  moreagent dashboard --serve --port 9000
+  moreagent dashboard --serve --open
   moreagent clean --runs
   moreagent clean --worktrees
   moreagent clean --all
@@ -256,6 +262,12 @@ async function main(): Promise<void> {
         const dashRunIdx = args.indexOf('--run');
         const dashLimitIdx = args.indexOf('--limit');
         const dashOutputIdx = args.indexOf('--output');
+        const dashServe = args.includes('--serve');
+        const dashWatch = args.includes('--watch');
+
+        if (dashWatch && !dashServe) {
+          exitWithError('Error: --watch requires --serve');
+        }
 
         const dashRunId = (() => {
           if (dashRunIdx === -1) return undefined;
@@ -279,11 +291,34 @@ async function main(): Promise<void> {
           return v;
         })();
 
+        const dashHostIdx = args.indexOf('--host');
+        const dashHost = (() => {
+          if (dashHostIdx === -1) return undefined;
+          const v = args[dashHostIdx + 1];
+          if (!v || v.startsWith('-')) exitWithError('Error: --host requires a value');
+          if (v !== '127.0.0.1' && v !== 'localhost') exitWithError('Error: --host must be 127.0.0.1 or localhost');
+          return v;
+        })();
+
+        const dashPortIdx = args.indexOf('--port');
+        const dashPort = (() => {
+          if (dashPortIdx === -1) return undefined;
+          const v = args[dashPortIdx + 1];
+          if (!v || v.startsWith('-')) exitWithError('Error: --port requires a value');
+          const n = parseInt(v, 10);
+          if (isNaN(n) || n < 1 || n > 65535) exitWithError('Error: --port must be a positive integer (1-65535), got: ' + v);
+          return n;
+        })();
+
         dashboardCommand({
           run: dashRunId,
           limit: dashLimit,
           output: dashOutput,
           open: args.includes('--open'),
+          serve: dashServe,
+          watch: dashWatch,
+          host: dashHost,
+          port: dashPort,
         });
         break;
       }

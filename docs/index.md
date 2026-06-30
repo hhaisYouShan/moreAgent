@@ -52,7 +52,9 @@ These documents describe pending future work, not current shipped behavior.
 - [V3.0 Dashboard Serve PRD](v3.0-dashboard-serve-prd.md)
 - [V3.0 Dashboard Serve Tech Plan](v3.0-dashboard-serve-tech-plan.md)
 
-## Product / Planning References
+## Legacy Product / Planning References
+
+These documents are early planning references and may not reflect the current V2.4 implementation state.
 
 - [Product Requirements](product-requirements.md)
 - [Product Requirements (zh-CN)](product-requirements.zh-CN.md)
