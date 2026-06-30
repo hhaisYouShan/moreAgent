@@ -156,8 +156,17 @@ function buildDashboardModel(selectedRun?: string, limit: number = DEFAULT_LIMIT
   };
 }
 
+function serializeJsonForScript(value: any): string {
+  return JSON.stringify(value, null, 2)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
 function renderDashboardHtml(model: DashboardModel): string {
-  const dataJson = JSON.stringify(model, null, 2);
+  const dataJson = serializeJsonForScript(model);
   const selectedId = model.selectedRunId || (model.runs[0]?.id ?? '');
 
   return `<!DOCTYPE html>

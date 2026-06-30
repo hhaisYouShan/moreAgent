@@ -886,6 +886,72 @@ test('Dashboard: --run selects specified run', () => {
 });
 
 // ============================================================
+// 7b. V2.0.1 Dashboard Hardening
+// ============================================================
+
+console.log('\n7b. Dashboard Hardening (V2.0.1)');
+console.log('================================');
+
+test('Dashboard: embedded JSON escapes closing script tag', () => {
+  const runId = 'dash-xss';
+  writeSessions(dashDir, { runs: [{
+    id: runId,
+    task: 'normal task </script><script>evil</script>',
+    status: 'completed',
+    createdAt: '2024-01-01T00:00:00Z',
+    artifactDir: path.join(dashDir, '.moreagent', 'runs', runId),
+    sessions: [
+      { id: 'x-1', agentName: 'implementer', status: 'completed', artifactDir: path.join(dashDir, '.moreagent', 'runs', runId, 'implementer'), startedAt: '2024-01-01T00:00:00Z', runId },
+    ],
+  }] });
+
+  const outP = path.join(TMP, 'dash-xss.html');
+  const r = runCliIn(dashDir, ['dashboard', '--output', outP]);
+  assert(r.status === 0, `dashboard should exit 0, got ${r.status}`);
+  const html = fs.readFileSync(outP, 'utf-8');
+
+  // Must have the data marker
+  assert(html.includes('window.__MOREAGENT_DASHBOARD_DATA__'), 'should contain data marker');
+
+  // Extract the data section and verify no raw </script> appears in the data JSON
+  const scriptStart = html.indexOf('window.__MOREAGENT_DASHBOARD_DATA__');
+  const scriptEnd = html.indexOf('(function(){', scriptStart);
+  const dataSection = html.slice(scriptStart, scriptEnd);
+  assert(!dataSection.includes('</script>'), 'data section should not contain raw closing script tag');
+  assert(!dataSection.includes('<script>'), 'data section should not contain raw opening script tag');
+
+  // Data must still be parseable
+  const data = extractDashboardData(html);
+  assert(data !== null, 'should extract dashboard data');
+  assert(data.runDetailsById[runId] !== undefined, 'run should be in data');
+});
+
+test('Dashboard: --limit invalid exits 1', () => {
+  const r = runCliIn(dashDir, ['dashboard', '--limit', 'abc']);
+  assert(r.status !== 0, `--limit abc should exit non-zero, got ${r.status}`);
+});
+
+test('Dashboard: --limit 0 exits 1', () => {
+  const r = runCliIn(dashDir, ['dashboard', '--limit', '0']);
+  assert(r.status !== 0, `--limit 0 should exit non-zero, got ${r.status}`);
+});
+
+test('Dashboard: --limit -1 exits 1', () => {
+  const r = runCliIn(dashDir, ['dashboard', '--limit', '-1']);
+  assert(r.status !== 0, `--limit -1 should exit non-zero, got ${r.status}`);
+});
+
+test('Dashboard: --run missing value exits 1', () => {
+  const r = runCliIn(dashDir, ['dashboard', '--run']);
+  assert(r.status !== 0, `--run with no value should exit non-zero, got ${r.status}`);
+});
+
+test('Dashboard: --output missing value exits 1', () => {
+  const r = runCliIn(dashDir, ['dashboard', '--output']);
+  assert(r.status !== 0, `--output with no value should exit non-zero, got ${r.status}`);
+});
+
+// ============================================================
 // 6. BUILD CHECK
 // ============================================================
 

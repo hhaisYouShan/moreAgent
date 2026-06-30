@@ -1,5 +1,21 @@
 # Changelog
 
+## V2.0.1 (2026-06-30)
+
+### Added
+- **Safe JSON serialization**: `serializeJsonForScript()` escapes `<`, `>`, `&`, U+2028, U+2029 in embedded dashboard data to prevent HTML injection via `</script>` in task/run fields
+- **Dashboard parameter validation** in `cli.ts`:
+  - `--limit` must be a positive integer (rejects `0`, `-1`, `abc`)
+  - `--run` rejects missing value
+  - `--output` rejects missing value
+  - All validation errors use `exitWithError()` with BAD_ARGS style
+- 6 new hardening tests (script tag escape, invalid/zero/negative limit, missing run/output values)
+
+### Verified
+- Task field containing `</script><script>evil</script>` does not break HTML structure
+- `window.__MOREAGENT_DASHBOARD_DATA__` remains JSON-parseable after escaping
+- Invalid arguments correctly exit non-zero with error message
+
 ## V2.0 (2026-06-30)
 
 ### Added

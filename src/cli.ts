@@ -252,14 +252,35 @@ async function main(): Promise<void> {
 
       case 'dashboard': {
         const dashRunIdx = args.indexOf('--run');
-        const dashRunId = dashRunIdx !== -1 ? args[dashRunIdx + 1] : undefined;
         const dashLimitIdx = args.indexOf('--limit');
-        const dashLimit = dashLimitIdx !== -1 ? parseInt(args[dashLimitIdx + 1], 10) : undefined;
         const dashOutputIdx = args.indexOf('--output');
-        const dashOutput = dashOutputIdx !== -1 ? args[dashOutputIdx + 1] : undefined;
+
+        const dashRunId = (() => {
+          if (dashRunIdx === -1) return undefined;
+          const v = args[dashRunIdx + 1];
+          if (!v || v.startsWith('-')) exitWithError('Error: --run requires a value');
+          return v;
+        })();
+
+        const dashLimit = (() => {
+          if (dashLimitIdx === -1) return undefined;
+          const v = args[dashLimitIdx + 1];
+          if (!v || v.startsWith('-')) exitWithError('Error: --limit requires a positive integer');
+          const n = parseInt(v, 10);
+          if (isNaN(n) || n < 1 || !isFinite(n)) exitWithError('Error: --limit must be a positive integer (got: ' + v + ')');
+          return n;
+        })();
+
+        const dashOutput = (() => {
+          if (dashOutputIdx === -1) return undefined;
+          const v = args[dashOutputIdx + 1];
+          if (!v || v.startsWith('-')) exitWithError('Error: --output requires a path value');
+          return v;
+        })();
+
         dashboardCommand({
           run: dashRunId,
-          limit: dashLimit || undefined,
+          limit: dashLimit,
           output: dashOutput,
         });
         break;
