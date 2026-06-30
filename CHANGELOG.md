@@ -10,10 +10,10 @@
   - `inspect --run <id> --json`: run overview
   - `inspect --run <id> --workflow --json`: workflow detail
 - **Error JSON**: all `--json` errors output `{ error: { code, message } }` with exit 1
-- **Error codes**: NO_RUNS, RUN_NOT_FOUND, NO_REPAIR_RUN, NO_FULL_RUN, NOT_INITIALIZED, INTERNAL_ERROR
+- **Error codes**: NO_RUNS, RUN_NOT_FOUND, NO_REPAIR_RUN, NO_FULL_RUN, NOT_INITIALIZED, INTERNAL_ERROR, UNSUPPORTED_JSON_MODE
 - **durationSeconds**: `number | null` in JSON (text keeps `32s` / `N/A`)
 - New `src/output/json.ts`: `printJson`, `printJsonError`, `isJsonMode`
-- 8 JSON-specific regression tests
+- 10 JSON-specific regression tests
 
 ### Design
 - `buildRunSummary`/`buildRunDetail`/`buildRunListItem`/`buildRunOverview`/`buildWorkflowModel` extract pure data from rendering functions
