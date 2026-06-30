@@ -94,10 +94,16 @@ function startServeMode(options: DashboardOptions): void {
   });
 
   process.on('SIGINT', () => {
-    handle.close();
+    handle.close().then(() => {
+      console.log('\nDashboard server stopped');
+      process.exit(0);
+    });
   });
   process.on('SIGTERM', () => {
-    handle.close();
+    handle.close().then(() => {
+      console.log('\nDashboard server stopped');
+      process.exit(0);
+    });
   });
 }
 
@@ -105,7 +111,7 @@ interface ServerHandle {
   url: string;
   host: string;
   port: number;
-  close: () => void;
+  close: () => Promise<void>;
 }
 
 function startDashboardServer(opts: {
@@ -185,9 +191,8 @@ function startDashboardServer(opts: {
     host: opts.host,
     port: opts.port,
     close: () => {
-      server.close(() => {
-        console.log('\nDashboard server stopped');
-        process.exit(0);
+      return new Promise<void>((resolve) => {
+        server.close(() => resolve());
       });
     },
   };

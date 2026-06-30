@@ -180,7 +180,25 @@ moreagent dashboard --limit 20 --open
 moreagent dashboard --run run-2026-06-29T12-00-00-abc123 --limit 5 --output /tmp/dash.html --open
 ```
 
-The dashboard is a static HTML file. It does not start a server, does not auto-refresh, and does not watch for changes.
+The static dashboard generates a single HTML file with all data embedded. For live monitoring, use `--serve`.
+
+### Dashboard Serve Mode (V3.0)
+
+Start a local HTTP server with live updates:
+
+```bash
+moreagent dashboard --serve
+moreagent dashboard --serve --watch
+moreagent dashboard --serve --open
+moreagent dashboard --serve --port 9000
+```
+
+The serve mode provides three endpoints:
+- `GET /` — dynamic dashboard HTML
+- `GET /data.json` — raw dashboard model JSON
+- `GET /health` — server health check
+
+`--serve --watch` enables 3000ms auto-refresh polling of `/data.json` with a manual refresh button.
 
 ### Report Quick Start
 

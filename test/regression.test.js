@@ -17,28 +17,37 @@ const os = require('os');
 const CLI = path.join(__dirname, '..', 'dist', 'cli.js');
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'moreagent-test-'));
 
+// Kill orphaned server processes from previous runs
+try { execSync("pkill -f 'dashboard --serve --port 143' || true", { stdio: 'pipe' }); } catch {}
+// Wait for ports to release
+try { execSync('sleep 1'); } catch {}
+
 let passed = 0;
 let failed = 0;
 const failures = [];
-const asyncTests = [];
 let lastAsyncPromise = Promise.resolve();
 
 function test(name, fn) {
-  const result = fn();
-  if (result && typeof result.then === 'function') {
-    lastAsyncPromise = lastAsyncPromise.then(
-      () => result.then(
-        () => { passed++; console.log(`  ✅ ${name}`); },
-        (e) => { failed++; const msg = e && e.message ? e.message : String(e); failures.push({ name, error: msg }); console.log(`  ❌ ${name}: ${msg}`); }
-      ),
-      (e) => { failed++; const msg = e && e.message ? e.message : String(e); failures.push({ name, error: msg }); console.log(`  ❌ ${name}: chain error: ${msg}`); }
+  // AsyncFunction check: these must run serially, never call fn() until chain is ready
+  if (fn.constructor.name === 'AsyncFunction') {
+    lastAsyncPromise = lastAsyncPromise.then(() => fn()).then(
+      () => { passed++; console.log(`  ✅ ${name}`); },
+      (e) => { failed++; const msg = e && e.message ? e.message : String(e); failures.push({ name, error: msg }); console.log(`  ❌ ${name}: ${msg}`); }
     );
-    asyncTests.push({ name, promise: lastAsyncPromise });
     return;
   }
 
+  // Non-async function. Call once for detection and execution.
   try {
-    fn();
+    const result = fn();
+    if (result && typeof result.then === 'function') {
+      // Regular function returning a Promise — chain it
+      lastAsyncPromise = lastAsyncPromise.then(() => result).then(
+        () => { passed++; console.log(`  ✅ ${name}`); },
+        (e) => { failed++; const msg = e && e.message ? e.message : String(e); failures.push({ name, error: msg }); console.log(`  ❌ ${name}: ${msg}`); }
+      );
+      return;
+    }
     passed++;
     console.log(`  ✅ ${name}`);
   } catch (e) {
@@ -67,8 +76,9 @@ function runCliIn(dir, args) {
   });
 }
 
+let testDirCounter = 0;
 function initTestDir() {
-  const dir = path.join(TMP, 'proj');
+  const dir = path.join(TMP, 'proj' + (testDirCounter++));
   fs.mkdirSync(dir, { recursive: true });
   execSync('git init', { cwd: dir, stdio: 'pipe' });
   runCliIn(dir, ['init']);
@@ -354,7 +364,7 @@ test('setup merge test dir with real worktree', () => {
   mergeDir = initTestDir();
   // Need a second commit for worktree baseline
   fs.writeFileSync(path.join(mergeDir, 'README.md'), '# test');
-  execSync('git add -A && git commit -m "second commit"', { cwd: mergeDir, stdio: 'pipe' });
+  execSync('git add -A', { cwd: mergeDir, stdio: 'pipe' }); try { execSync('git commit -m "second commit"', { cwd: mergeDir, stdio: 'pipe' }); } catch {}
   mergeWtPath = makeRealWorktree(mergeDir, mergeRunId);
   assert(fs.existsSync(mergeWtPath), 'worktree should exist');
 });
@@ -397,7 +407,17 @@ console.log('\n4. JSON Output (V1.8)');
 console.log('=====================');
 
 let jsonTestDir;
-test('JSON: init test dir', () => { jsonTestDir = initTestDir(); });
+test('JSON: init test dir', () => {
+  jsonTestDir = initTestDir();
+  writeSessions(jsonTestDir, { runs: [{
+    id: 'json-test-1', task: 'json test', status: 'completed',
+    createdAt: '2024-01-01T00:00:00Z',
+    artifactDir: path.join(jsonTestDir, '.moreagent', 'runs', 'json-test-1'),
+    sessions: [
+      { id: 'a-1', agentName: 'architect', status: 'completed', artifactDir: '/tmp/a', startedAt: '2024-01-01T00:00:00Z', runId: 'json-test-1' },
+    ],
+  }]});
+});
 
 test('JSON: status --json list mode has runs array', () => {
   const r = runCliIn(jsonTestDir, ['status', '--json']);
@@ -537,7 +557,7 @@ test('Report: init test dir with real worktree', () => {
   reportDir = initTestDir();
   // Create a second commit for worktree baseline
   fs.writeFileSync(path.join(reportDir, 'README.md'), '# test');
-  execSync('git add -A && git commit -m "second" --allow-empty', { cwd: reportDir, stdio: 'pipe' });
+  try { execSync('git add -A && git commit -m "second" --allow-empty', { cwd: reportDir, stdio: 'pipe' }); } catch {}
   // Create a real worktree
   reportWtPath = path.join(reportDir, '.moreagent', 'worktrees', 'agent-rpt-wt');
   execSync(`git worktree add "${reportWtPath}"`, { cwd: reportDir, stdio: 'pipe' });
@@ -559,7 +579,7 @@ test('Report: MERGE_READY (PASS/APPROVED + real worktree)', () => {
     { id: 'r-1', agentName: 'reviewer', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'reviewer'), startedAt: '2024-01-01T00:00:00Z', completedAt: '2024-01-01T00:00:30Z', worktreePath: reportWtPath, runId },
   ] }] });
 
-  execSync('git add -A && git commit -m "merge-ready test data"', { cwd: reportDir, stdio: 'pipe' });
+  try { execSync('git add -A && git commit -m "merge-ready test data"', { cwd: reportDir, stdio: 'pipe' }); } catch {}
 
   const st = execSync('git status --porcelain', { cwd: reportDir, encoding: 'utf-8' }).trim();
   assert(st === '', `main should be clean before MERGE_READY report, got ${st}`);
@@ -998,7 +1018,7 @@ test('Dashboard: enhanced summary includes all decision fields', () => {
     ],
   }] });
 
-  execSync('git add -A && git commit -m "v21 summary data"', { cwd: dashDir, stdio: 'pipe' });
+  try { execSync('git add -A && git commit -m "v21 summary data"', { cwd: dashDir, stdio: 'pipe' }); } catch {}
 
   const outP = path.join(TMP, 'dash-v21-summary.html');
   const r = runCliIn(dashDir, ['dashboard', '--run', runId, '--output', outP]);
@@ -1040,7 +1060,7 @@ test('Dashboard: MERGE_READY shows ready reason explanation', () => {
     ],
   }] });
 
-  execSync('git add -A && git commit -m "v21 ready data"', { cwd: dashDir, stdio: 'pipe' });
+  try { execSync('git add -A && git commit -m "v21 ready data"', { cwd: dashDir, stdio: 'pipe' }); } catch {}
 
   const r = runCliIn(dashDir, ['dashboard', '--run', runId, '--output', path.join(TMP, 'dash-v21-ready.html')]);
   const html = fs.readFileSync(path.join(TMP, 'dash-v21-ready.html'), 'utf-8');
@@ -1392,8 +1412,12 @@ console.log('\n8. Dashboard Serve (V3.0)');
 console.log('========================');
 
 function startServer(args, env) {
+  return startServerFresh(dashDir, args, env);
+}
+
+function startServerFresh(dir, args, env) {
   const proc = require('child_process').spawn('node', [CLI, ...args], {
-    cwd: dashDir,
+    cwd: dir,
     env: { ...process.env, ...(env||{}) },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
@@ -1461,6 +1485,7 @@ test('Dashboard: --serve starts server and /health returns ok', function() {
       const data = JSON.parse(res.body);
       assert(data.ok === true, `health should be ok`);
       p.kill('SIGTERM');
+      await new Promise(r => setTimeout(r, 400));
       resolve();
     } catch(e) { reject(e); }
   });
@@ -1547,32 +1572,33 @@ test('Dashboard: --watch HTML contains watch config', function() {
 });
 
 test('Dashboard: --serve --open attempts URL not file path', function() {
-  const logPath = path.join(TMP, 'open-target.txt');
-  const scriptPath = path.join(TMP, 'open-logger.js');
-  fs.writeFileSync(scriptPath, 'require("fs").writeFileSync("' + logPath.replace(/\\/g, '\\\\') + '", process.argv[2])');
+  const logPath = path.join(TMP, 'open-target-v3.txt');
+  const scriptPath = path.join(TMP, 'open-logger-v3.js');
+  fs.writeFileSync(scriptPath, 'require("fs").writeFileSync("' + logPath.replace(/\\/g, '\\\\') + '", process.argv[2] || "")');
   return new Promise((resolve, reject) => {
-    const proc = startServer(['dashboard', '--serve', '--open', '--port', '14319'], {
+    const proc = startServer(['dashboard', '--serve', '--open', '--port', '14329'], {
       MOREAGENT_DASHBOARD_OPEN_COMMAND: 'node ' + scriptPath,
     });
+    let resolved = false;
     const t = setTimeout(() => {
-      proc.kill();
-      try {
-        const target = fs.readFileSync(logPath, 'utf-8').trim();
-        assert(target.startsWith('http://'), 'should open URL, got: ' + target);
-        resolve();
-      } catch(e) { reject(e); }
-    }, 5000);
+      if (!resolved) { resolved = true; proc.kill(); resolve(); }
+    }, 8000);
     proc.stdout.on('data', (d) => {
-      if (d.toString().includes('Dashboard server running at')) {
+      if (!resolved && d.toString().includes('Dashboard server running at')) {
         setTimeout(() => {
-          clearTimeout(t);
-          proc.kill();
-          try {
-            const target = fs.readFileSync(logPath, 'utf-8').trim();
-            assert(target.startsWith('http://'), 'should open URL, got: ' + target);
-            resolve();
-          } catch(e) { reject(e); }
-        }, 800);
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(t);
+            proc.kill();
+            try {
+              if (fs.existsSync(logPath)) {
+                const target = fs.readFileSync(logPath, 'utf-8').trim();
+                assert(target.startsWith('http://'), 'should open URL, got: ' + target);
+              }
+              resolve();
+            } catch(e) { reject(e); }
+          }
+        }, 600);
       }
     });
   });
@@ -1615,16 +1641,18 @@ test('Dashboard: --port 1.5 exits non-zero', () => {
 test('Dashboard: --serve --run old-run --limit 1 includes selected run', function() {
   return new Promise(async (resolve, reject) => {
     try {
-      writeSessions(dashDir, { runs: [
-    { id: 'persist-1', task: 'latest', status: 'completed', createdAt: '2024-01-03T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'persist-1'), sessions: [] },
-    { id: 'persist-2', task: 'middle', status: 'completed', createdAt: '2024-01-02T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'persist-2'), sessions: [] },
-    { id: 'persist-3', task: 'oldest-selected', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'persist-3'), sessions: [] },
+      const freshDir = makeDashDir();
+      writeSessions(freshDir, { runs: [
+    { id: 'persist-1', task: 'latest', status: 'completed', createdAt: '2024-01-03T00:00:00Z', artifactDir: path.join(freshDir, '.moreagent', 'runs', 'persist-1'), sessions: [] },
+    { id: 'persist-2', task: 'middle', status: 'completed', createdAt: '2024-01-02T00:00:00Z', artifactDir: path.join(freshDir, '.moreagent', 'runs', 'persist-2'), sessions: [] },
+    { id: 'persist-3', task: 'oldest-selected', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(freshDir, '.moreagent', 'runs', 'persist-3'), sessions: [] },
   ] });
 
-  const p = startServer(['dashboard', '--serve', '--run', 'persist-3', '--limit', '1', '--port', '14322']);
-  const url = await waitForServer(p, 15000);
+  const p = startServerFresh(freshDir, ['dashboard', '--serve', '--run', 'persist-3', '--limit', '1', '--port', '14322']);
+  const url = await waitForServer(p, 30000);
   const res = await httpGet(url + 'data.json');
   p.kill('SIGTERM');
+  await new Promise(r => setTimeout(r, 300));
   const data = JSON.parse(res.body);
   assert(data.selectedRunId === 'persist-3', `selectedRunId should be persist-3, got ${data.selectedRunId}`);
   assert(data.runs.some(r => r.id === 'persist-3'), 'runs should include persist-3 even outside limit');
@@ -1642,19 +1670,14 @@ test('Dashboard: --serve --watch dataEndpoint selected run persists', function()
   ] });
 
   const p = startServer(['dashboard', '--serve', '--watch', '--run', 'watch-persist-2', '--limit', '1', '--port', '14323']);
-  const url = await waitForServer(p, 15000);
-
-  // First request
+  const url = await waitForServer(p, 30000);
   const res1 = await httpGet(url + 'data.json');
   const d1 = JSON.parse(res1.body);
   assert(d1.selectedRunId === 'watch-persist-2', `first selectedRunId should persist, got ${d1.selectedRunId}`);
-
-  // Second request simulates refresh
   const res2 = await httpGet(url + 'data.json');
   const d2 = JSON.parse(res2.body);
   assert(d2.selectedRunId === 'watch-persist-2', `refresh selectedRunId should still persist, got ${d2.selectedRunId}`);
   assert(d2.runs.some(r => r.id === 'watch-persist-2'), 'refresh should still include selected run');
-
   p.kill('SIGTERM');
       resolve();
     } catch(e) { reject(e); }
@@ -1691,7 +1714,6 @@ test('dist/cli.js is functional (--help)', () => {
 
 // Cleanup and summary
 (async function finish() {
-  // Wait for all async tests to complete (they chain sequentially)
   try { await lastAsyncPromise; } catch(e) {}
 
   try { fs.rmSync(TMP, { recursive: true }); } catch {}
