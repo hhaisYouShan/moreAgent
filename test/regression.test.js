@@ -962,6 +962,133 @@ test('Dashboard: --output missing value exits 1', () => {
 });
 
 // ============================================================
+// 7c. V2.1 Dashboard Usability Enhancements
+// ============================================================
+
+console.log('\n7c. Dashboard Usability (V2.1)');
+console.log('==============================');
+
+test('Dashboard: enhanced summary includes all decision fields', () => {
+  const runId = 'dash-v21-summary';
+  writeArtifactForReport(dashDir, runId, 'tester', 'test-report.md', 'Result: PASS\n\nOK');
+  writeArtifactForReport(dashDir, runId, 'reviewer', 'review-report.md', 'Decision: APPROVED\n\nOK');
+  writeSessions(dashDir, { runs: [{
+    id: runId, task: 'summary test', status: 'completed',
+    createdAt: '2024-01-01T00:00:00Z',
+    artifactDir: path.join(dashDir, '.moreagent', 'runs', runId),
+    sessions: [
+      { id: 's-1', agentName: 'tester', status: 'completed', artifactDir: path.join(dashDir, '.moreagent', 'runs', runId, 'tester'), startedAt: '2024-01-01T00:00:00Z', runId },
+      { id: 'r-1', agentName: 'reviewer', status: 'completed', artifactDir: path.join(dashDir, '.moreagent', 'runs', runId, 'reviewer'), startedAt: '2024-01-01T00:00:00Z', runId },
+    ],
+  }] });
+
+  execSync('git add -A && git commit -m "v21 summary data"', { cwd: dashDir, stdio: 'pipe' });
+
+  const outP = path.join(TMP, 'dash-v21-summary.html');
+  const r = runCliIn(dashDir, ['dashboard', '--run', runId, '--output', outP]);
+  const html = fs.readFileSync(outP, 'utf-8');
+
+  assert(html.includes('Overall Status'), 'should have Overall Status');
+  assert(html.includes('Can Resume'), 'should have Can Resume');
+  assert(html.includes('Can Merge'), 'should have Can Merge');
+  assert(html.includes('Main Clean'), 'should have Main Clean');
+  assert(html.includes('Worktree Exists'), 'should have Worktree Exists');
+});
+
+test('Dashboard: failed run has visible marker in sidebar', () => {
+  const runId = 'dash-v21-failed';
+  writeSessions(dashDir, { runs: [{
+    id: runId, task: 'failed task', status: 'failed',
+    createdAt: '2024-01-01T00:00:00Z',
+    artifactDir: path.join(dashDir, '.moreagent', 'runs', runId),
+    sessions: [
+      { id: 'f-1', agentName: 'implementer', status: 'failed', artifactDir: path.join(dashDir, '.moreagent', 'runs', runId, 'implementer'), startedAt: '2024-01-01T00:00:00Z', runId },
+    ],
+  }] });
+
+  const r = runCliIn(dashDir, ['dashboard', '--output', path.join(TMP, 'dash-v21-failed.html')]);
+  const html = fs.readFileSync(path.join(TMP, 'dash-v21-failed.html'), 'utf-8');
+  assert(html.includes('run-failed'), 'should have run-failed class on failed run item');
+});
+
+test('Dashboard: MERGE_READY shows ready reason explanation', () => {
+  const runId = 'dash-v21-ready';
+  writeArtifactForReport(dashDir, runId, 'tester', 'test-report.md', 'Result: PASS\n\nOK');
+  writeArtifactForReport(dashDir, runId, 'reviewer', 'review-report.md', 'Decision: APPROVED\n\nOK');
+  writeSessions(dashDir, { runs: [{
+    id: runId, task: 'ready test', status: 'completed',
+    createdAt: '2024-01-01T00:00:00Z',
+    artifactDir: path.join(dashDir, '.moreagent', 'runs', runId),
+    sessions: [
+      { id: 't-1', agentName: 'tester', status: 'completed', artifactDir: path.join(dashDir, '.moreagent', 'runs', runId, 'tester'), startedAt: '2024-01-01T00:00:00Z', runId },
+    ],
+  }] });
+
+  execSync('git add -A && git commit -m "v21 ready data"', { cwd: dashDir, stdio: 'pipe' });
+
+  const r = runCliIn(dashDir, ['dashboard', '--run', runId, '--output', path.join(TMP, 'dash-v21-ready.html')]);
+  const html = fs.readFileSync(path.join(TMP, 'dash-v21-ready.html'), 'utf-8');
+  assert(html.includes('MERGE_READY'), 'should mention MERGE_READY');
+  assert(html.includes('main repository is clean'), 'should explain why ready');
+});
+
+test('Dashboard: BLOCKED shows blocked reason explanation', () => {
+  const runId = 'dash-v21-blocked';
+  fs.writeFileSync(path.join(dashDir, '.moreagent', 'dirty-test'), 'x');
+  writeArtifactForReport(dashDir, runId, 'tester', 'test-report.md', 'Result: PASS\n\nOK');
+  writeArtifactForReport(dashDir, runId, 'reviewer', 'review-report.md', 'Decision: APPROVED\n\nOK');
+  writeSessions(dashDir, { runs: [{
+    id: runId, task: 'blocked test', status: 'completed',
+    createdAt: '2024-01-01T00:00:00Z',
+    artifactDir: path.join(dashDir, '.moreagent', 'runs', runId),
+    sessions: [
+      { id: 't-1', agentName: 'tester', status: 'completed', artifactDir: path.join(dashDir, '.moreagent', 'runs', runId, 'tester'), startedAt: '2024-01-01T00:00:00Z', runId },
+    ],
+  }] });
+
+  const r = runCliIn(dashDir, ['dashboard', '--run', runId, '--output', path.join(TMP, 'dash-v21-blocked.html')]);
+  const html = fs.readFileSync(path.join(TMP, 'dash-v21-blocked.html'), 'utf-8');
+  assert(html.includes('BLOCKED'), 'should mention BLOCKED');
+  assert(html.includes('not clean') || html.includes('uncommitted'), 'should explain why blocked');
+  try { fs.unlinkSync(path.join(dashDir, '.moreagent', 'dirty-test')); } catch {}
+});
+
+test('Dashboard: JSON / Debug section still accessible', () => {
+  const runId = 'dash-v21-debug';
+  writeSessions(dashDir, { runs: [{
+    id: runId, task: 'debug test', status: 'completed',
+    createdAt: '2024-01-01T00:00:00Z',
+    artifactDir: path.join(dashDir, '.moreagent', 'runs', runId),
+    sessions: [
+      { id: 'd-1', agentName: 'implementer', status: 'completed', artifactDir: path.join(dashDir, '.moreagent', 'runs', runId, 'implementer'), startedAt: '2024-01-01T00:00:00Z', runId },
+    ],
+  }] });
+
+  const r = runCliIn(dashDir, ['dashboard', '--run', runId, '--output', path.join(TMP, 'dash-v21-debug.html')]);
+  const html = fs.readFileSync(path.join(TMP, 'dash-v21-debug.html'), 'utf-8');
+  assert(html.includes('JSON / Debug'), 'should have JSON / Debug section');
+  assert(html.includes('Status JSON'), 'should have Status JSON tab');
+  assert(html.includes('Report JSON'), 'should have Report JSON tab');
+  assert(html.includes('Workflow JSON'), 'should have Workflow JSON tab');
+});
+
+test('Dashboard: MVP run still shows workflow unavailable', () => {
+  const runId = 'dash-v21-mvp';
+  writeSessions(dashDir, { runs: [{
+    id: runId, task: 'mvp v21 test', status: 'completed',
+    createdAt: '2024-01-01T00:00:00Z',
+    artifactDir: path.join(dashDir, '.moreagent', 'runs', runId),
+    sessions: [
+      { id: 'm-1', agentName: 'implementer', status: 'completed', artifactDir: path.join(dashDir, '.moreagent', 'runs', runId, 'implementer'), startedAt: '2024-01-01T00:00:00Z', runId },
+    ],
+  }] });
+
+  const r = runCliIn(dashDir, ['dashboard', '--run', runId, '--output', path.join(TMP, 'dash-v21-mvp.html')]);
+  const html = fs.readFileSync(path.join(TMP, 'dash-v21-mvp.html'), 'utf-8');
+  assert(html.includes('MVP run') || html.includes('workflow unavailable'), 'MVP run should show workflow unavailable');
+});
+
+// ============================================================
 // 6. BUILD CHECK
 // ============================================================
 

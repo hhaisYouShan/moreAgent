@@ -1,5 +1,20 @@
 # Changelog
 
+## V2.1 (2026-06-30)
+
+### Added — Dashboard Usability Enhancement
+- **Enhanced Summary** section: Overall Status + Recommendation at top with color-coded hero display, plus condition pills (Can Resume, Can Merge, Main Clean, Worktree Exists)
+- **Sidebar readability**: colored left borders for failed (red), running (yellow), merge-ready (green) runs; shows status, recommendation, profile badges and createdAt time per run item
+- **Workflow Progress**: fixed 9-phase display with clear completed/failed/pending colors; MVP runs show degraded "workflow unavailable" banner
+- **Merge Readiness explanation**: ready reason ("MERGE_READY: Run has passed all checks...") and blocked reason ("BLOCKED: main repository is not clean...") derived from existing report model
+- **Collapsible JSON/Debug**: default collapsed with Show/Hide toggle; error displays for statusError, reportError, workflowError
+- **View helpers**: `pill()`, `truncTask()`, `statusColor()`, `recColor()`, `buildMergeExplanation()`, `toggleDebug()`
+- 6 new V2.1 tests: enhanced summary fields, failed run sidebar marker, MERGE_READY explanation, BLOCKED explanation, JSON/Debug accessible, MVP downgrade preserved
+
+### Unchanged
+- No changes to report.ts, status.ts, inspect.ts, JSON schema, or CLI behavior
+- All 58 prior tests continue to pass
+
 ## V2.0.1 (2026-06-30)
 
 ### Added

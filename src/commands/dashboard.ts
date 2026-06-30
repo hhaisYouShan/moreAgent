@@ -235,6 +235,24 @@ td{padding:6px 8px;border-bottom:1px solid #21262d}
 .mvp-banner{background:#d2992220;border:1px solid #d29922;border-radius:4px;padding:8px 12px;color:#d29922;font-size:12px;margin-bottom:16px}
 .merge-ok{color:#3fb950}
 .merge-no{color:#f85149}
+.run-failed{border-left:3px solid #f85149}
+.run-running{border-left:3px solid #d29922}
+.run-merge_ready{border-left:3px solid #3fb950}
+.summary-hero{display:flex;gap:20px;align-items:center;margin-bottom:12px}
+.summary-hero .hero-status{font-size:28px;font-weight:700}
+.summary-hero .hero-recommendation{font-size:18px;font-weight:600}
+.summary-pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.status-pill{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:4px;font-size:11px;font-weight:600;background:#21262d;border:1px solid #30363d}
+.status-pill.good{background:#23863620;border-color:#238636;color:#3fb950}
+.status-pill.bad{background:#da363320;border-color:#da3633;color:#f85149}
+.status-pill.warn{background:#d2992220;border-color:#d29922;color:#d29922}
+.merge-explain{background:#0d1117;border:1px solid #30363d;border-radius:4px;padding:12px;font-size:12px;margin-top:12px}
+.merge-explain.ready{border-color:#238636;background:#23863610}
+.merge-explain.blocked{border-color:#da3633;background:#da363310}
+.debug-toggle{cursor:pointer;color:#58a6ff;font-size:13px;padding:8px 16px;user-select:none}
+.debug-toggle:hover{color:#79c0ff}
+.debug-collapsed .section-body,.debug-collapsed .tabs,.debug-collapsed .tab-content{display:none}
+.debug-expanded .section-body,.debug-expanded .tabs,.debug-expanded .tab-content{display:block}
 </style>
 </head>
 <body>
@@ -286,19 +304,41 @@ window.__MOREAGENT_DASHBOARD_DATA__ = ${dataJson};
     var html = '';
     for (var i=0;i<list.length;i++) {
       var r = list[i];
-      var sel = r.id===currentRunId ? ' selected' : '';
       var details = getDetails(r.id);
+      var report = (details&&details.report&&details.report.report) ? details.report.report : null;
+      var decision = report ? report.decision : null;
+
+      var sel = r.id===currentRunId ? ' selected' : '';
+      var extraClass = '';
+      if (r.status==='failed') extraClass = ' run-failed';
+      else if (r.status==='running') extraClass = ' run-running';
+      else if (decision && decision.recommendation==='MERGE_READY') extraClass = ' run-merge_ready';
+
       var badge = '';
-      if (details&&details.report&&details.report.report&&details.report.report.decision){
-        var d = details.report.report.decision;
-        badge = '<span class="badge badge-'+d.overallStatus+'">'+d.overallStatus+'</span>';
+      if (decision){
+        badge = '<span class="badge badge-'+esc(decision.overallStatus)+'">'+esc(decision.overallStatus)+'</span>';
       } else {
         badge = '<span class="badge badge-UNKNOWN">N/A</span>';
       }
-      html += '<div class="run-item'+sel+'" data-run-id="'+esc(r.id)+'" onclick="selectRun(\\''+esc(r.id)+'\\')">'+
+
+      var recBadge = '';
+      if (decision && decision.recommendation) {
+        recBadge = '<span class="badge badge-'+esc(decision.recommendation)+'">'+esc(decision.recommendation)+'</span>';
+      }
+
+      var profileBadge = '';
+      var prof = r.workflow ? r.workflow.profile : (r.profile||'mvp');
+      profileBadge = '<span style="font-size:10px;color:#8b949e;text-transform:uppercase">'+esc(prof)+'</span>';
+
+      var shortTime = '';
+      if (r.createdAt) {
+        try { shortTime = new Date(r.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); }catch(e){ shortTime = r.createdAt.slice(0,16); }
+      }
+
+      html += '<div class="run-item'+sel+extraClass+'" data-run-id="'+esc(r.id)+'" onclick="selectRun(\\''+esc(r.id)+'\\')" title="'+esc(r.task||'')+'">'+
+        '<div class="task">'+esc(truncTask(r.task||''))+'</div>'+
         '<div class="id">'+esc(r.id)+'</div>'+
-        '<div class="task">'+esc(r.task||'')+'</div>'+
-        '<div class="meta">'+badge+'<span style="color:#8b949e">'+esc(r.status||'')+'</span></div>'+
+        '<div class="meta">'+badge+recBadge+profileBadge+'<span style="font-size:10px;color:#6e7681">'+esc(shortTime)+'</span></div>'+
         '</div>';
     }
     document.getElementById('run-list').innerHTML=html;
@@ -318,25 +358,28 @@ window.__MOREAGENT_DASHBOARD_DATA__ = ${dataJson};
 
     var html = '';
 
-    // A. Header Summary
-    html += '<div class="section"><div class="section-title">Run Header</div><div class="section-body">';
+    // A. Enhanced Summary
+    html += '<div class="section"><div class="section-title">Overall Status</div><div class="section-body">';
     if (!isFull && details&&details.workflowError&&details.workflowError.code==='NOT_FULL_WORKFLOW'){
       html += '<div class="mvp-banner">workflow unavailable \u2014 MVP run</div>';
     }
-    html += '<div class="row">'+
-      '<div class="col"><div class="label">Run ID</div><div class="value">'+esc(brief.id)+'</div></div>'+
-      '<div class="col"><div class="label">Task</div><div class="value">'+esc(brief.task||'N/A')+'</div></div>'+
-      '<div class="col"><div class="label">Status</div><div class="value">'+esc(brief.status||'N/A')+'</div></div>'+
-      '<div class="col"><div class="label">Profile</div><div class="value">'+esc(workflowInfo.profile||'mvp')+'</div></div>'+
-      '<div class="col"><div class="label">Created</div><div class="value">'+esc(brief.createdAt||'')+'</div></div>'+
-      '</div>';
+
     if (decision) {
-      html += '<div class="row" style="margin-top:12px">'+
-        '<div class="col"><div class="label">Overall Status</div><div class="value"><span class="badge badge-'+esc(decision.overallStatus)+'">'+esc(decision.overallStatus)+'</span></div></div>'+
-        '<div class="col"><div class="label">Recommendation</div><div class="value"><span class="badge badge-'+esc(decision.recommendation)+'">'+esc(decision.recommendation)+'</span></div></div>'+
-        '<div class="col"><div class="label">Can Resume</div><div class="value">'+(decision.canResume?'yes':'no')+'</div></div>'+
+      html += '<div class="summary-hero">'+
+        '<div class="hero-status" style="color:'+statusColor(decision.overallStatus)+'">'+esc(decision.overallStatus)+'</div>'+
+        '<div class="hero-recommendation" style="color:'+recColor(decision.recommendation)+'">'+esc(decision.recommendation)+'</div>'+
         '</div>';
+      html += '<div class="summary-pills">'+
+        pill(decision.canResume,'Can Resume')+
+        pill(report.merge.canMerge,'Can Merge')+
+        pill(report.merge.mainClean,'Main Clean')+
+        pill(report.worktree.exists,'Worktree Exists')+
+        '</div>';
+    } else if (brief) {
+      html += '<div class="summary-hero"><div class="hero-status" style="color:#8b949e">'+esc(brief.status||'N/A')+'</div></div>';
     }
+
+    html += '<div style="font-size:12px;color:#8b949e">Run ID: '+esc(brief.id)+' &middot; Task: '+esc(brief.task||'N/A')+' &middot; Profile: '+esc(workflowInfo.profile||'mvp')+'</div>';
     html += '</div></div>';
 
     // B. Workflow Report
@@ -396,7 +439,11 @@ window.__MOREAGENT_DASHBOARD_DATA__ = ${dataJson};
     var merge = report ? (report.merge||{}) : {};
     var wt = report ? (report.worktree||{}) : {};
     html += '<div class="section"><div class="section-title">Merge Readiness</div><div class="section-body">';
-    html += '<div class="row">'+
+
+    var mergeExplain = buildMergeExplanation(decision, merge, wt);
+    html += '<div class="merge-explain '+((decision&&decision.recommendation==='MERGE_READY')?'ready':'blocked')+'">'+esc(mergeExplain)+'</div>';
+
+    html += '<div class="row" style="margin-top:12px">'+
       '<div class="col"><div class="label">Can Merge</div><div class="value '+(merge.canMerge?'merge-ok':'merge-no')+'">'+(merge.canMerge?'yes':'no')+(merge.blockedReason?' ('+esc(merge.blockedReason)+')':'')+'</div></div>'+
       '<div class="col"><div class="label">Main Clean</div><div class="value '+(merge.mainClean?'merge-ok':'merge-no')+'">'+(merge.mainClean?'yes':'no')+'</div></div>'+
       '<div class="col"><div class="label">Worktree</div><div class="value">'+(wt.path||'none')+(wt.branch?' ('+esc(wt.branch)+')':'')+'</div></div>'+
@@ -434,17 +481,26 @@ window.__MOREAGENT_DASHBOARD_DATA__ = ${dataJson};
     }
     html += '</div></div>';
 
-    // G. JSON / Debug
-    html += '<div class="section"><div class="section-title">JSON / Debug</div>'+
+    // G. JSON / Debug (collapsible)
+    html += '<div class="section debug-collapsed" id="debug-section"><div class="section-title" style="display:flex;justify-content:space-between;align-items:center">'+
+      '<span>JSON / Debug</span>'+
+      '<span class="debug-toggle" onclick="toggleDebug()">\u25b6 Show</span>'+
+      '</div>'+
       '<div class="tabs">'+
       '<div class="tab active" onclick="switchTab(this,\\'status-tab\\')">Status JSON</div>'+
       '<div class="tab" onclick="switchTab(this,\\'report-tab\\')">Report JSON</div>'+
       '<div class="tab" onclick="switchTab(this,\\'workflow-tab\\')">Workflow JSON</div>'+
       '</div>'+
       '<div class="tab-content">'+
-      '<div class="tab-panel active" id="status-tab"><div class="json-block">'+escJson(details?details.status:null)+'</div></div>'+
-      '<div class="tab-panel" id="report-tab"><div class="json-block">'+escJson(details?details.report:null)+'</div></div>'+
-      '<div class="tab-panel" id="workflow-tab"><div class="json-block">'+escJson(details?details.workflow:null)+'</div></div>'+
+      '<div class="tab-panel active" id="status-tab">'+
+      (details&&details.statusError?'<div class="error-box">Status Error: '+esc(details.statusError.message||'')+' (code: '+esc(details.statusError.code||'N/A')+')</div>':'')+
+      '<div class="json-block">'+escJson(details?details.status:null)+'</div></div>'+
+      '<div class="tab-panel" id="report-tab">'+
+      (details&&details.reportError?'<div class="error-box">Report Error: '+esc(details.reportError.message||'')+' (code: '+esc(details.reportError.code||'N/A')+')</div>':'')+
+      '<div class="json-block">'+escJson(details?details.report:null)+'</div></div>'+
+      '<div class="tab-panel" id="workflow-tab">'+
+      (details&&details.workflowError?'<div class="error-box">Workflow Error: '+esc(details.workflowError.message||'')+' (code: '+esc(details.workflowError.code||'N/A')+')</div>':'')+
+      '<div class="json-block">'+escJson(details?details.workflow:null)+'</div></div>'+
       '</div></div>';
 
     document.getElementById('main-content').innerHTML=html;
@@ -459,6 +515,58 @@ window.__MOREAGENT_DASHBOARD_DATA__ = ${dataJson};
 
   function esc(s){ if(!s)return''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
   function escJson(v){ if(!v)return'null'; try{return esc(JSON.stringify(v,null,2));}catch(e){return esc(String(v));} }
+
+  function truncTask(task) {
+    if (!task) return '';
+    return task.length > 50 ? task.slice(0,50)+'\u2026' : task;
+  }
+
+  function pill(cond, label) {
+    var cls = cond ? 'good' : 'warn';
+    return '<span class="status-pill '+cls+'">'+(cond?'\u2713':'\u2717')+' '+esc(label)+'</span>';
+  }
+
+  function statusColor(s) {
+    if (s==='PASSED') return '#3fb950';
+    if (s==='FAILED') return '#f85149';
+    if (s==='RUNNING') return '#d29922';
+    if (s==='PARTIAL') return '#a371f7';
+    return '#8b949e';
+  }
+
+  function recColor(s) {
+    if (s==='MERGE_READY') return '#3fb950';
+    if (s==='BLOCKED'||s==='NEEDS_REPAIR') return '#f85149';
+    if (s==='NEEDS_REVIEW') return '#a371f7';
+    return '#8b949e';
+  }
+
+  function buildMergeExplanation(decision, merge, wt) {
+    if (!decision) return 'No decision data available.';
+    if (decision.recommendation==='MERGE_READY') {
+      return 'MERGE_READY: Run has passed all checks \u2014 overall status is PASSED, main repository is clean, worktree exists, and merge is permitted.';
+    }
+    var reasons = [];
+    if (decision.overallStatus!=='PASSED') reasons.push('overall status is not PASSED (currently: '+decision.overallStatus+')');
+    if (!merge.canMerge) reasons.push('canMerge is false'+(merge.blockedReason?' ('+merge.blockedReason+')':''));
+    if (!merge.mainClean) reasons.push('main repository is not clean (has uncommitted changes)');
+    if (!wt.exists) reasons.push('worktree does not exist or is missing');
+    return 'BLOCKED: '+(reasons.length>0 ? reasons.join('; ') : 'merge is blocked for unknown reason')+'.';
+  }
+
+  window.toggleDebug = function() {
+    var sec = document.getElementById('debug-section');
+    var toggle = sec.querySelector('.debug-toggle');
+    if (sec.classList.contains('debug-collapsed')) {
+      sec.classList.remove('debug-collapsed');
+      sec.classList.add('debug-expanded');
+      toggle.innerHTML = '\u25bc Hide';
+    } else {
+      sec.classList.remove('debug-expanded');
+      sec.classList.add('debug-collapsed');
+      toggle.innerHTML = '\u25b6 Show';
+    }
+  };
 
   window.selectRun = function(runId) {
     currentRunId = runId;
