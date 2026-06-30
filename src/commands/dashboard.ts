@@ -485,6 +485,8 @@ window.__MOREAGENT_DASHBOARD_RUNTIME__ = ${runtimeJson};
   var currentRunId = '${selectedId}';
   var currentFilter = 'all';
 
+  // === All function and variable definitions (must come before early return) ===
+  var FULL_PHASES = ['brain','prd','prd-review','prd-gate','tech-plan','tech-gate','implementation','test','review'];${"\n"}
   // -- serve mode runtime -- (must init before any early returns)
   var RT = window.__MOREAGENT_DASHBOARD_RUNTIME__ || {};
   if (RT.serveMode) { initServeRuntime(); }
@@ -493,8 +495,6 @@ window.__MOREAGENT_DASHBOARD_RUNTIME__ = ${runtimeJson};
     renderSidebar();
     return;
   }
-
-  var FULL_PHASES = ['brain','prd','prd-review','prd-gate','tech-plan','tech-gate','implementation','test','review'];
 
   // ---- Safe ViewModel helpers (browser-side) ----
   function safeText(v, fb) { if (v===null||v===undefined||v==='') return fb; if (typeof v==='string') return v.trim()||fb; if (typeof v==='number'||typeof v==='boolean') return String(v); return fb; }

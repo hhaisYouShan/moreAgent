@@ -1,5 +1,14 @@
 # Changelog
 
+## V3.1 (2026-06-30)
+
+### Added — Dashboard Serve Usability Hardening
+- **Structured startup output**: `Dashboard server started` with URL, Host, Port, Watch, Refresh interval, Selected run, Limit
+- **Runtime status strip**: _Last refreshed_, _Refreshing..._, _Refresh failed_, _Showing last successful data_
+- **Refresh pipeline**: `refreshDashboard(trigger)` with manual/watch support, `detectPartialErrors()` for child status/report/workflow errors
+- **No-runs resilience**: empty pages retain Refresh data button and runtime status; watch mode continues polling; new runs auto-render on refresh
+- 10 new V3.1 tests: startup output (×3), runtime status text, Refresh button, no-runs serve with runtime, no-runs→runs refresh
+
 ## V3.0 (2026-06-30)
 
 ### Added — Dashboard `--serve` / `--watch`

@@ -1783,6 +1783,38 @@ test('V3.1: no-runs serve page contains Refresh data and runtime status', functi
   });
 });
 
+test('V3.1: no-runs serves refreshes to show new runs without crash', function() {
+  return new Promise(async (resolve, reject) => {
+    try {
+      writeSessions(dashDir, { runs: [] });
+      const p = startServer(['dashboard', '--serve', '--port', '14349']);
+      const url = await waitForServer(p, 10000);
+
+      // First fetch: no runs
+      const res1 = await httpGet(url + 'data.json');
+      const d1 = JSON.parse(res1.body);
+      assert(d1.runs.length === 0, 'initially no runs');
+
+      // Add a run without restarting server
+      writeSessions(dashDir, { runs: [{ id: 'v31-newrun', task: 'appeared later', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'v31-newrun'), sessions: [] }] });
+
+      // Second fetch: should now have runs
+      const res2 = await httpGet(url + 'data.json');
+      const d2 = JSON.parse(res2.body);
+      assert(d2.runs.length === 1, 'should now have 1 run after refresh');
+      assert(d2.selectedRunId === 'v31-newrun', 'selectedRunId should be the new run');
+
+      // HTML should still render
+      const res3 = await httpGet(url);
+      assert(res3.body.includes('MoreAgent Dashboard'), 'HTML should still render');
+      assert(res3.body.includes('v31-newrun'), 'HTML should contain the new run');
+
+      p.kill('SIGTERM');
+      resolve();
+    } catch(e) { reject(e); }
+  });
+});
+
 // ============================================================
 // 6. BUILD CHECK
 // ============================================================
