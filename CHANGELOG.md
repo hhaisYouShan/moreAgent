@@ -3,11 +3,11 @@
 ## V1.7.2 (2026-06-30)
 
 ### Regression Tests Added
-24 regression tests exercising production code via CLI commands:
-- **Protocol line parsing** (7 tests): bare + bold `Decision/Result` lines via `status --summary` CLI
-- **Result anti-match** (3 tests): `FAILURES: 0` not FAIL, genuine FAIL detected
+16 regression tests exercising production code via CLI commands:
+- **Protocol line parsing** (8 tests): bare + bold `Decision/Result` lines via `status --summary` CLI
+- **Result anti-match** (part of protocol): `FAILURES: 0` not FAIL, genuine FAIL detected
 - **Pending session filter** (3 tests): full workflow base sessions hidden, architect/started not hidden
-- **Merge boundary** (2 tests): dry-run on dirty main, `--apply` rejects dirty main
+- **Merge boundary** (3 tests): real worktree setup, dry-run shows Run/Worktree/Branch, `--apply` rejects dirty main
 - **Build** (2 tests): dist exists, CLI `--help` functional
 
 ### Changed
