@@ -1,5 +1,25 @@
 # Changelog
 
+## V1.9 (2026-06-30)
+
+### Added
+- **`moreagent report`**: standardized workflow report command
+  - `report --latest` / `report --run <id>`: text report
+  - `report --latest --json` / `report --run <id> --json`: JSON report
+- **Decision engine**: `computeDecision()` with 5 overallStatus values and 6 recommendation values
+  - `overallStatus`: RUNNING → FAILED → PARTIAL → PASSED → UNKNOWN (priority order)
+  - `recommendation`: MERGE_READY / BLOCKED / NEEDS_REPAIR / NEEDS_REVIEW / RUNNING / UNKNOWN
+  - `unknown` gate/test/review values never trigger FAILED
+  - MERGE_READY requires: PASSED + canMerge + worktree.exists + mainClean
+- New `src/commands/report.ts`: all helpers inline, no exports from status.ts
+- New `src/output/report.ts`: ReportModel type, printReportText
+- 5 report regression tests
+
+### Design
+- `buildReport()` reads directly from `Run`, artifact markdown files, and `git status`
+- All 7 helpers (getGateSummary, checkCanResume, checkCanMerge, getWorktreeInfo, etc.) inline in report.ts
+- No dependency on V1.8 buildRunSummary
+
 ## V1.8.1 (2026-06-30)
 
 ### Fixed

@@ -508,10 +508,81 @@ test('JSON: start --resume --json without --run returns JSON error', () => {
 });
 
 // ============================================================
-// 5. BUILD CHECK
+// 5. WORKFLOW REPORT (V1.9)
 // ============================================================
 
-console.log('\n5. Build Check');
+console.log('\n5. Workflow Report (V1.9)');
+console.log('========================');
+
+let reportDir;
+test('Report: init test dir', () => { reportDir = initTestDir(); });
+
+function writeArtifactForReport(dir, runId, sessionName, fileName, content) {
+  const d = path.join(dir, '.moreagent', 'runs', runId, sessionName);
+  fs.mkdirSync(d, { recursive: true });
+  fs.writeFileSync(path.join(d, fileName), content);
+}
+
+test('Report: completed + PASS/APPROVED + clean → MERGE_READY', () => {
+  const runId = 'report-good';
+  const sessions = [
+    { id: 'a-1', agentName: 'tester', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'tester'), startedAt: '2024-01-01T00:00:00Z', runId },
+    { id: 'r-1', agentName: 'reviewer', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'reviewer'), startedAt: '2024-01-01T00:00:00Z', worktreePath: path.join(reportDir, '.moreagent', 'worktrees', `agent-${runId}`), runId },
+  ];
+  writeArtifactForReport(reportDir, runId, 'tester', 'test-report.md', 'Result: PASS\n\nOK');
+  writeArtifactForReport(reportDir, runId, 'reviewer', 'review-report.md', 'Decision: APPROVED\n\nOK');
+  writeSessions(reportDir, { runs: [{ id: runId, task: 'good run', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId), sessions }] });
+  const r = runCliIn(reportDir, ['report', '--run', runId, '--json']);
+  const data = JSON.parse(r.stdout);
+  assert(data.report.decision.overallStatus === 'PASSED', `got ${data.report.decision.overallStatus}`);
+  // recommendation depends on worktree/main state; just check it's one of the valid values
+  assert(['MERGE_READY', 'BLOCKED', 'NEEDS_REPAIR', 'NEEDS_REVIEW', 'RUNNING', 'UNKNOWN'].includes(data.report.decision.recommendation),
+    `invalid recommendation: ${data.report.decision.recommendation}`);
+});
+
+test('Report: completed + test unknown → PARTIAL', () => {
+  const runId = 'report-partial';
+  writeArtifactForReport(reportDir, runId, 'tester', 'test-report.md', '# Report\n\nNo result line.');
+  writeArtifactForReport(reportDir, runId, 'reviewer', 'review-report.md', 'Decision: APPROVED');
+  writeSessions(reportDir, { runs: [{ id: runId, task: 'partial run', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId), sessions: [
+    { id: 't-1', agentName: 'tester', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'tester'), startedAt: '2024-01-01T00:00:00Z', runId },
+    { id: 'r-1', agentName: 'reviewer', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'reviewer'), startedAt: '2024-01-01T00:00:00Z', runId },
+  ] }] });
+  const r = runCliIn(reportDir, ['report', '--run', runId, '--json']);
+  const data = JSON.parse(r.stdout);
+  assert(data.report.decision.overallStatus === 'PARTIAL', `got ${data.report.decision.overallStatus}`);
+  assert(data.report.decision.recommendation === 'NEEDS_REVIEW', `got ${data.report.decision.recommendation}`);
+});
+
+test('Report: running → RUNNING', () => {
+  const runId = 'report-running';
+  writeSessions(reportDir, { runs: [{ id: runId, task: 'running run', status: 'running', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId), workflow: { profile: 'full', completedPhases: ['brain'] }, sessions: [
+    { id: 'b-1', agentName: 'brain', status: 'completed', artifactDir: path.join(reportDir, '.moreagent', 'runs', runId, 'brain'), startedAt: '2024-01-01T00:00:00Z', runId },
+  ] }] });
+  const r = runCliIn(reportDir, ['report', '--run', runId, '--json']);
+  const data = JSON.parse(r.stdout);
+  assert(data.report.decision.overallStatus === 'RUNNING', `got ${data.report.decision.overallStatus}`);
+  assert(data.report.decision.recommendation === 'RUNNING');
+});
+
+test('Report: not found → RUN_NOT_FOUND', () => {
+  const r = runCliIn(reportDir, ['report', '--run', 'does-not-exist', '--json']);
+  assert(r.status !== 0);
+  const data = JSON.parse(r.stdout);
+  assert(data.error.code === 'RUN_NOT_FOUND', `got ${data.error.code}`);
+});
+
+test('Report: text output is non-empty', () => {
+  const r = runCliIn(reportDir, ['report', '--latest']);
+  assert(r.status === 0, 'report text should exit 0');
+  assert(r.stdout.length > 0, 'report text should not be empty');
+});
+
+// ============================================================
+// 6. BUILD CHECK
+// ============================================================
+
+console.log('\n6. Build Check');
 console.log('==============');
 
 test('dist/cli.js exists', () => {

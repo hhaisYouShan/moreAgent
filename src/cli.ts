@@ -6,6 +6,7 @@ import { initCommand, type InitProfile } from './commands/init';
 import { inspectCommand } from './commands/inspect';
 import { mergeCommand } from './commands/merge';
 import { queueAddCommand, queueListCommand, queueRecoverCommand, queueRetryCommand } from './commands/queue';
+import { reportCommand } from './commands/report';
 import {
   sessionsListCommand,
   sessionsResetCommand,
@@ -223,6 +224,17 @@ async function main(): Promise<void> {
         } else {
           exitWithError('Usage: moreagent sessions <list|reset|export>');
         }
+        break;
+      }
+
+      case 'report': {
+        const reportRunIdx = args.indexOf('--run');
+        const reportRunId = reportRunIdx !== -1 ? args[reportRunIdx + 1] : undefined;
+        reportCommand({
+          latest: args.includes('--latest') && !reportRunId,
+          run: reportRunId,
+          json: args.includes('--json'),
+        });
         break;
       }
 
