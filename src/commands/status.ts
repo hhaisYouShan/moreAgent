@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
 import { readSessions } from '../session';
+import { printJson, printJsonError } from '../output/json';
 import { Run, Session } from '../types';
 
 export interface StatusOptions {
@@ -10,6 +11,7 @@ export interface StatusOptions {
   latestFull?: boolean;
   run?: string;
   summary?: boolean;
+  json?: boolean;
 }
 
 const DEFAULT_LIMIT = 10;
@@ -21,6 +23,9 @@ export function statusCommand(options: StatusOptions = {}): void {
   const runs = [...data.runs].sort(compareRunsByCreatedAtDesc);
 
   if (runs.length === 0) {
+    if (options.json) {
+      printJsonError('NO_RUNS', 'No runs found.');
+    }
     console.log('No runs found.');
     return;
   }
@@ -29,7 +34,14 @@ export function statusCommand(options: StatusOptions = {}): void {
     const needle = options.run;
     const run = runs.find((r) => r.id === needle || r.id.startsWith(needle));
     if (!run) {
-      console.log(`Run not found: ${options.run}`);
+      if (options.json) {
+        printJsonError('RUN_NOT_FOUND', `Run not found: ${needle}`);
+      }
+      console.log(`Run not found: ${needle}`);
+      return;
+    }
+    if (options.json) {
+      printJson({ run: buildRunDetail(run) });
       return;
     }
     if (options.summary) {
@@ -43,8 +55,15 @@ export function statusCommand(options: StatusOptions = {}): void {
   if (options.latestRepair) {
     const repairRun = runs.find(isRepairRun);
     if (!repairRun) {
+      if (options.json) {
+        printJsonError('NO_REPAIR_RUN', 'No repair run found.');
+      }
       console.log('No repair run found.');
       console.log('Repair runs have sessions containing repair/retry/failure-analysis/revision.');
+      return;
+    }
+    if (options.json) {
+      printJson({ run: buildRunDetail(repairRun) });
       return;
     }
     if (options.summary) {
@@ -58,10 +77,17 @@ export function statusCommand(options: StatusOptions = {}): void {
   if (options.latestFull) {
     const fullRun = runs.find(isFullWorkflowRun);
     if (!fullRun) {
+      if (options.json) {
+        printJsonError('NO_FULL_RUN', 'No full workflow run found.');
+      }
       console.log('No full workflow run found.');
       console.log('Create one with:');
       console.log('  moreagent init --profile full');
       console.log('  moreagent start --once --task "your task"');
+      return;
+    }
+    if (options.json) {
+      printJson({ run: buildRunDetail(fullRun) });
       return;
     }
     if (options.summary) {
@@ -73,6 +99,10 @@ export function statusCommand(options: StatusOptions = {}): void {
   }
 
   if (options.latest) {
+    if (options.json) {
+      printJson({ run: buildRunDetail(runs[0]) });
+      return;
+    }
     if (options.summary) {
       printRunSummary(runs[0]);
     } else {
@@ -81,7 +111,78 @@ export function statusCommand(options: StatusOptions = {}): void {
     return;
   }
 
+  if (options.json) {
+    printJson({ runs: runs.slice(0, DEFAULT_LIMIT).map(buildRunListItem) });
+    return;
+  }
   printRunList(runs.slice(0, DEFAULT_LIMIT));
+}
+
+function buildRunListItem(run: Run) {
+  return {
+    id: run.id,
+    task: run.task,
+    status: run.status,
+    profile: getProfile(run),
+    createdAt: run.createdAt,
+    hasRepair: isRepairRun(run),
+  };
+}
+
+function buildRunSummary(run: Run) {
+  const wt = getWorktreeInfo(run);
+  const repaired = isRepairRun(run);
+  const canResume = checkCanResume(run);
+  const canMerge = checkCanMerge(run);
+  const gates = getGateSummary(run);
+  const rs = getRepairSummary(run);
+  const lastFailed = findLastFailed(run);
+
+  return {
+    id: run.id,
+    task: run.task,
+    status: run.status,
+    createdAt: run.createdAt,
+    profile: getProfile(run),
+    completed: run.status === 'completed',
+    failed: run.status === 'failed',
+    canResume: canResume.ok,
+    resumeBlockedReason: canResume.ok ? '' : canResume.reason,
+    canMerge: canMerge.ok,
+    mergeBlockedReason: canMerge.ok ? '' : canMerge.reason,
+    hasRepair: repaired,
+    repairSessions: { total: rs.total, failureAnalysis: rs.failureAnalysis, repairs: rs.repairs, retries: rs.retries, revisions: rs.revisions },
+    hasGate: gates.hasGate,
+    gates: { prdGate: gates.prdGate, techGate: gates.techGate, test: gates.test, review: gates.review },
+    worktree: { hasWorktree: wt.hasWorktree, exists: wt.exists, path: wt.path || '', branch: wt.branch, dirty: wt.dirty },
+    lastFailed: lastFailed ? { agentName: lastFailed.agentName, status: lastFailed.status, error: lastFailed.error || '' } : null,
+    failedPhase: run.workflow?.failedPhase || null,
+    nextActions: getNextActions(run, canResume, canMerge, repaired),
+  };
+}
+
+function buildRunDetail(run: Run) {
+  const summary = buildRunSummary(run);
+  return {
+    ...summary,
+    completedPhases: run.workflow?.completedPhases || [],
+    currentPhase: run.workflow?.currentPhase || null,
+    sessions: run.sessions
+      .filter((s) => !isHiddenFullWorkflowPending(s, run))
+      .map((s) => ({
+        agentName: s.agentName,
+        status: s.status,
+        durationSeconds: s.startedAt && s.completedAt
+          ? Math.round((new Date(s.completedAt).getTime() - new Date(s.startedAt).getTime()) / 1000)
+          : null,
+        startedAt: s.startedAt || null,
+        completedAt: s.completedAt || null,
+        artifactDir: s.artifactDir,
+        runtimeSessionId: s.runtimeSessionId || null,
+        worktreePath: s.worktreePath || null,
+        error: s.error || null,
+      })),
+  };
 }
 
 function printRunSummary(run: Run): void {

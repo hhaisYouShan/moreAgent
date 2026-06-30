@@ -1,22 +1,31 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { readSessions } from '../session';
+import { printJson, printJsonError } from '../output/json';
 import { Run, Session } from '../types';
 
 export interface InspectOptions {
   run?: string;
   agent?: string;
   workflow?: boolean;
+  json?: boolean;
 }
 
 export function inspectCommand(options: InspectOptions = {}): void {
   const run = findRun(options.run);
   if (!run) {
+    if (options.json) {
+      printJsonError('RUN_NOT_FOUND', 'No runs found.');
+    }
     console.log('No runs found.');
     return;
   }
 
   if (options.workflow) {
+    if (options.json) {
+      printJson(buildWorkflowModel(run));
+      return;
+    }
     printWorkflowInfo(run);
     return;
   }
@@ -26,6 +35,10 @@ export function inspectCommand(options: InspectOptions = {}): void {
     return;
   }
 
+  if (options.json) {
+    printJson({ run: buildRunOverview(run) });
+    return;
+  }
   printRunOverview(run);
 }
 
@@ -190,6 +203,74 @@ function getWorktreePath(run: Run): string | undefined {
     }
   }
   return run.sessions.find((s) => s.worktreePath)?.worktreePath;
+}
+
+function buildRunOverview(run: Run) {
+  const wt = getWorktreePath(run);
+  return {
+    id: run.id,
+    task: run.task,
+    status: run.status,
+    createdAt: run.createdAt,
+    artifactDir: run.artifactDir,
+    worktree: wt || null,
+    sessions: run.sessions.map((s) => ({
+      agentName: s.agentName,
+      status: s.status,
+      durationSeconds: s.startedAt && s.completedAt
+        ? Math.round((new Date(s.completedAt).getTime() - new Date(s.startedAt).getTime()) / 1000)
+        : null,
+      artifactDir: s.artifactDir,
+      primaryArtifact: resolvePrimaryArtifact(s.agentName),
+      error: s.error || null,
+    })),
+  };
+}
+
+function buildWorkflowModel(run: Run) {
+  const gates = getGateSnapshot(run);
+  const repairSessions = run.sessions.filter((s) => {
+    const n = s.agentName;
+    return n.includes('repair') || n.includes('retry') || n.includes('failure-analysis') || n.includes('revision');
+  });
+  const lastFailed = [...run.sessions].reverse().find((s) => s.status === 'failed');
+
+  return {
+    run: buildRunOverview(run),
+    workflow: {
+      profile: run.workflow?.profile || 'full',
+      currentPhase: run.workflow?.currentPhase || null,
+      completedPhases: run.workflow?.completedPhases || [],
+      failedPhase: run.workflow?.failedPhase || null,
+      gates,
+      repairSessions: repairSessions.map((s) => ({
+        agentName: s.agentName,
+        status: s.status,
+        error: s.error || null,
+      })),
+      lastFailed: lastFailed ? { agentName: lastFailed.agentName, status: lastFailed.status, error: lastFailed.error || null } : null,
+      suggestedCommands: [`moreagent inspect --run ${run.id}`, ...repairSessions.slice(0, 3).map((s) => `moreagent inspect --run ${run.id} --agent ${s.agentName}`)],
+    },
+  };
+}
+
+function getGateSnapshot(run: Run) {
+  const gates: Record<string, string> = {};
+  for (const s of run.sessions) {
+    try {
+      for (const f of fs.readdirSync(s.artifactDir)) {
+        if (!f.endsWith('.md')) continue;
+        const fp = path.join(s.artifactDir, f);
+        const c = readFileSafe(fp);
+        if (!c) continue;
+        if (f.startsWith('prd-decision')) gates.prdGate = parseDecisionLine(c);
+        if (f.startsWith('tech-review')) gates.techGate = parseDecisionLine(c);
+        if (f.includes('test-report')) gates.test = parseResultLine(c);
+        if (f.includes('review-report')) gates.review = parseDecisionLine(c);
+      }
+    } catch { /* dir may not exist */ }
+  }
+  return gates;
 }
 
 function printWorkflowInfo(run: Run): void {

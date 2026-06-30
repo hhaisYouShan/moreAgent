@@ -374,10 +374,83 @@ test('merge --apply on dirty main: rejects with clean message', () => {
 });
 
 // ============================================================
-// 4. BUILD CHECK
+// 4. JSON OUTPUT (V1.8)
 // ============================================================
 
-console.log('\n4. Build Check');
+console.log('\n4. JSON Output (V1.8)');
+console.log('=====================');
+
+let jsonTestDir;
+test('JSON: init test dir', () => { jsonTestDir = initTestDir(); });
+
+test('JSON: status --json list mode has runs array', () => {
+  const r = runCliIn(jsonTestDir, ['status', '--json']);
+  assert(r.status === 0, `list --json should exit 0, got ${r.status}`);
+  const data = JSON.parse(r.stdout);
+  assert(Array.isArray(data.runs), 'runs should be array');
+});
+
+test('JSON: status --latest --json has run.id', () => {
+  const r = runCliIn(jsonTestDir, ['status', '--latest', '--json']);
+  const data = JSON.parse(r.stdout);
+  assert(typeof data.run.id === 'string', 'missing run.id');
+});
+
+test('JSON: status --run missing --json returns error JSON + exit 1', () => {
+  const r = runCliIn(jsonTestDir, ['status', '--run', 'does-not-exist', '--json']);
+  assert(r.status !== 0, 'should exit non-zero');
+  const data = JSON.parse(r.stdout);
+  assert(data.error, 'missing error object');
+  assert(data.error.code === 'RUN_NOT_FOUND', `expected RUN_NOT_FOUND, got ${data.error.code}`);
+});
+
+test('JSON: inspect --run missing --json returns error JSON + exit 1', () => {
+  const r = runCliIn(jsonTestDir, ['inspect', '--run', 'does-not-exist', '--json']);
+  assert(r.status !== 0, 'should exit non-zero');
+  const data = JSON.parse(r.stdout);
+  assert(data.error, 'missing error object');
+});
+
+test('JSON: non-json mode errors still use text', () => {
+  const r = runCliIn(jsonTestDir, ['status', '--run', 'does-not-exist']);
+  assert(r.stdout.includes('not found') || r.stderr.includes('not found'),
+    'non-json error should be text');
+});
+
+test('JSON: status --run summary --json has canResume/canMerge/gates', () => {
+  // Write a completed run for testing
+  writeSessions(jsonTestDir, {
+    runs: [{
+      id: 'json-run', task: 'test json', status: 'completed',
+      createdAt: '2024-01-01T00:00:00Z',
+      artifactDir: path.join(jsonTestDir, '.moreagent', 'runs', 'json-run'),
+      sessions: [
+        { id: 'a-1', agentName: 'architect', status: 'completed',
+          artifactDir: '/tmp/a', startedAt: '2024-01-01T00:00:00Z', completedAt: '2024-01-01T00:00:30Z', runId: 'json-run' },
+      ],
+    }]
+  });
+  const r = runCliIn(jsonTestDir, ['status', '--run', 'json-run', '--summary', '--json']);
+  const data = JSON.parse(r.stdout);
+  assert(typeof data.run.canResume === 'boolean', 'canResume not boolean');
+  assert(typeof data.run.canMerge === 'boolean', 'canMerge not boolean');
+  assert(typeof data.run.gates === 'object', 'gates not object');
+});
+
+test('JSON: durationSeconds is number or null', () => {
+  const r = runCliIn(jsonTestDir, ['status', '--latest', '--json']);
+  const data = JSON.parse(r.stdout);
+  for (const s of (data.run.sessions || [])) {
+    assert(s.durationSeconds === null || typeof s.durationSeconds === 'number',
+      `durationSeconds should be number|null, got ${typeof s.durationSeconds}`);
+  }
+});
+
+// ============================================================
+// 5. BUILD CHECK
+// ============================================================
+
+console.log('\n5. Build Check');
 console.log('==============');
 
 test('dist/cli.js exists', () => {

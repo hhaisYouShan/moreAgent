@@ -1,5 +1,25 @@
 # Changelog
 
+## V1.8 (2026-06-30)
+
+### Added
+- **JSON output**: `status --json` / `inspect --json` for machine consumption
+  - `status --json`: list mode `{ runs: [...] }`
+  - `status --latest --json`: single run `{ run: {...} }`
+  - `status --run <id> --summary --json`: compact summary
+  - `inspect --run <id> --json`: run overview
+  - `inspect --run <id> --workflow --json`: workflow detail
+- **Error JSON**: all `--json` errors output `{ error: { code, message } }` with exit 1
+- **Error codes**: NO_RUNS, RUN_NOT_FOUND, NO_REPAIR_RUN, NO_FULL_RUN, NOT_INITIALIZED, INTERNAL_ERROR
+- **durationSeconds**: `number | null` in JSON (text keeps `32s` / `N/A`)
+- New `src/output/json.ts`: `printJson`, `printJsonError`, `isJsonMode`
+- 8 JSON-specific regression tests
+
+### Design
+- `buildRunSummary`/`buildRunDetail`/`buildRunListItem`/`buildRunOverview`/`buildWorkflowModel` extract pure data from rendering functions
+- Text and JSON share the same data model, rendered independently
+- `cli.ts` top-level catch handles JSON error output
+
 ## V1.7.2 (2026-06-30)
 
 ### Regression Tests Added

@@ -14,6 +14,7 @@ import {
 } from './commands/sessions';
 import { statusCommand } from './commands/status';
 import { startCommand } from './commands/start';
+import { isJsonMode, printJsonError } from './output/json';
 
 function printHelp(): void {
   console.log(`
@@ -177,6 +178,7 @@ async function main(): Promise<void> {
           latestFull: args.includes('--latest-full'),
           run: statusRunId,
           summary: args.includes('--summary'),
+          json: args.includes('--json'),
         });
         break;
       }
@@ -196,7 +198,7 @@ async function main(): Promise<void> {
         const inspectAgentIdx = args.indexOf('--agent');
         const inspectAgent =
           inspectAgentIdx !== -1 ? args[inspectAgentIdx + 1] : undefined;
-        inspectCommand({ run: inspectRunId, agent: inspectAgent, workflow: args.includes('--workflow') });
+        inspectCommand({ run: inspectRunId, agent: inspectAgent, workflow: args.includes('--workflow'), json: args.includes('--json') });
         break;
       }
 
@@ -250,6 +252,9 @@ async function main(): Promise<void> {
         process.exit(1);
     }
   } catch (err: any) {
+    if (args.includes('--json')) {
+      printJsonError('INTERNAL_ERROR', err.message);
+    }
     console.error(`Error: ${err.message}`);
     process.exit(1);
   }
