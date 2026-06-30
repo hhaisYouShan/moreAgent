@@ -1848,6 +1848,127 @@ test('V3.1: runs cleared to empty refreshes to empty state', function() {
 });
 
 // ============================================================
+// 10. V3.2 Init --full
+// ============================================================
+
+console.log('\n10. Init --full (V3.2)');
+console.log('=====================');
+
+function freshGitDir(name) {
+  const dir = path.join(TMP, name);
+  fs.mkdirSync(dir, { recursive: true });
+  execSync('git init', { cwd: dir, stdio: 'pipe' });
+  return dir;
+}
+
+test('init: default creates MVP bootstrap', () => {
+  const dir = freshGitDir('v32-mvp');
+  const r = runCliIn(dir, ['init']);
+  assert(r.status === 0, 'default init should exit 0');
+  assert(fs.existsSync(path.join(dir, '.moreagent', 'config.yaml')), 'should create config.yaml');
+  assert(fs.existsSync(path.join(dir, '.moreagent', 'sessions.json')), 'should create sessions.json');
+  const config = fs.readFileSync(path.join(dir, '.moreagent', 'config.yaml'), 'utf-8');
+  assert(config.includes('architect'), 'MVP config should include architect');
+  assert(config.includes('implementer'), 'MVP config should include implementer');
+  assert(fs.existsSync(path.join(dir, '.opencode', 'agents', 'architect.md')), 'should create architect agent');
+  assert(!fs.existsSync(path.join(dir, '.moreagent', 'integration-guide.md')), 'MVP should not create integration guide');
+});
+
+test('init: --profile full creates full config and agents', () => {
+  const dir = freshGitDir('v32-profile-full');
+  const r = runCliIn(dir, ['init', '--profile', 'full']);
+  assert(r.status === 0, '--profile full should exit 0');
+  const config = fs.readFileSync(path.join(dir, '.moreagent', 'config.yaml'), 'utf-8');
+  assert(config.includes('brain'), 'full config should include brain');
+  assert(config.includes('product'), 'full config should include product');
+  assert(config.includes('frontend'), 'full config should include frontend');
+  assert(config.includes('backend'), 'full config should include backend');
+  assert(fs.existsSync(path.join(dir, '.opencode', 'agents', 'brain.md')), 'should create brain agent');
+  assert(fs.existsSync(path.join(dir, '.opencode', 'agents', 'product.md')), 'should create product agent');
+  assert(fs.existsSync(path.join(dir, '.moreagent', 'integration-guide.md')), 'should create integration guide');
+});
+
+test('init: --full creates full bootstrap', () => {
+  const dir = freshGitDir('v32-full');
+  const r = runCliIn(dir, ['init', '--full']);
+  assert(r.status === 0, '--full should exit 0');
+  assert(fs.existsSync(path.join(dir, '.moreagent', 'config.yaml')), 'config.yaml');
+  assert(fs.existsSync(path.join(dir, '.moreagent', 'sessions.json')), 'sessions.json');
+  assert(fs.existsSync(path.join(dir, '.moreagent', 'tasks.json')), 'tasks.json');
+  assert(fs.existsSync(path.join(dir, '.moreagent', 'runtime-sessions.json')), 'runtime-sessions.json');
+  assert(fs.existsSync(path.join(dir, '.moreagent', 'integration-guide.md')), 'integration-guide.md');
+  assert(fs.existsSync(path.join(dir, '.opencode', 'agents', 'brain.md')), 'brain.md');
+  assert(fs.existsSync(path.join(dir, '.opencode', 'agents', 'frontend.md')), 'frontend.md');
+  assert(fs.existsSync(path.join(dir, '.opencode', 'agents', 'backend.md')), 'backend.md');
+  assert(fs.existsSync(path.join(dir, '.opencode', 'agents', 'tester.md')), 'tester.md');
+  assert(fs.existsSync(path.join(dir, '.opencode', 'agents', 'reviewer.md')), 'reviewer.md');
+});
+
+test('init: --profile mvp --full exits non-zero', () => {
+  const dir = freshGitDir('v32-conflict');
+  const r = runCliIn(dir, ['init', '--profile', 'mvp', '--full']);
+  assert(r.status !== 0, '--profile mvp --full should fail');
+});
+
+test('init: --profile abc exits non-zero', () => {
+  const dir = freshGitDir('v32-bad-profile');
+  const r = runCliIn(dir, ['init', '--profile', 'abc']);
+  assert(r.status !== 0, '--profile abc should fail');
+});
+
+test('init: --profile missing value exits non-zero', () => {
+  const dir = freshGitDir('v32-no-val');
+  const r = runCliIn(dir, ['init', '--profile']);
+  assert(r.status !== 0, '--profile missing value should fail');
+});
+
+test('init: repeated --full does not overwrite config', () => {
+  const dir = freshGitDir('v32-repeat');
+  runCliIn(dir, ['init', '--full']);
+  const orig = fs.readFileSync(path.join(dir, '.moreagent', 'config.yaml'), 'utf-8');
+  fs.writeFileSync(path.join(dir, '.moreagent', 'config.yaml'), orig + '\n# custom comment');
+  runCliIn(dir, ['init', '--full']);
+  const updated = fs.readFileSync(path.join(dir, '.moreagent', 'config.yaml'), 'utf-8');
+  assert(updated.includes('custom comment'), 'config should not be overwritten');
+});
+
+test('init: repeated --full does not overwrite custom agent', () => {
+  const dir = freshGitDir('v32-repeat-agent');
+  runCliIn(dir, ['init', '--full']);
+  fs.writeFileSync(path.join(dir, '.opencode', 'agents', 'frontend.md'), '# CUSTOM FRONTEND PROMPT');
+  runCliIn(dir, ['init', '--full']);
+  const content = fs.readFileSync(path.join(dir, '.opencode', 'agents', 'frontend.md'), 'utf-8');
+  assert(content.includes('CUSTOM FRONTEND PROMPT'), 'custom agent should not be overwritten');
+});
+
+test('init: integration guide includes 9 phases and roles', () => {
+  const dir = freshGitDir('v32-guide');
+  runCliIn(dir, ['init', '--full']);
+  const guide = fs.readFileSync(path.join(dir, '.moreagent', 'integration-guide.md'), 'utf-8');
+  assert(guide.includes('brain'), 'should mention brain');
+  assert(guide.includes('product'), 'should mention product');
+  assert(guide.includes('frontend'), 'should mention frontend');
+  assert(guide.includes('backend'), 'should mention backend');
+  assert(guide.includes('tester'), 'should mention tester');
+  assert(guide.includes('reviewer'), 'should mention reviewer');
+  assert(guide.includes('moreagent start --once'), 'should include recommended command');
+});
+
+test('init: existing .moreagent without config still creates missing files', () => {
+  const dir = freshGitDir('v32-missing');
+  fs.mkdirSync(path.join(dir, '.moreagent'), { recursive: true });
+  const r = runCliIn(dir, ['init', '--full']);
+  assert(r.status === 0, 'should succeed');
+  assert(fs.existsSync(path.join(dir, '.moreagent', 'config.yaml')), 'should create config');
+});
+
+test('init: help shows --profile full and --full', () => {
+  const r = runCli(['--help']);
+  assert(r.stdout.includes('init --profile full'), 'help should include --profile full');
+  assert(r.stdout.includes('init --full'), 'help should include --full');
+});
+
+// ============================================================
 // 6. BUILD CHECK
 // ============================================================
 

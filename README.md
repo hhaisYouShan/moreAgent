@@ -30,10 +30,14 @@ chmod +x dist/cli.js
 ### 1. Initialize
 
 ```bash
-moreagent init
+moreagent init              # MVP profile (architect, implementer, tester, reviewer)
+moreagent init --full       # Full workflow (brain, product, frontend, backend, tester, reviewer)
+moreagent init --profile full
 ```
 
-This creates `.moreagent/config.yaml`, `.moreagent/sessions.json`, `.moreagent/runs/`, `.moreagent/worktrees/`, and `.opencode/agents/` with default agent definitions.
+This creates `.moreagent/` with `config.yaml`, `sessions.json`, `tasks.json`, `runtime-sessions.json`, `runs/`, `worktrees/`, and `.opencode/agents/`.
+
+`init --full` also generates `.moreagent/integration-guide.md` — a project-level reference for the 9-phase workflow, agent roles, recommended commands, and safety notes. Re-running `init --full` is safe: existing files are not overwritten.
 
 ### 2. Configure (optional)
 

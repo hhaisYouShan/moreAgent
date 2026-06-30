@@ -1,12 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import {
-  getMoreAgentDir,
-  configExists,
-  getOpenCodeAgentsDir,
-} from '../config';
-import { initTasksFile } from '../queue';
-import { initRuntimeSessionRegistry } from '../runtimeSessions';
+import { getMoreAgentDir, getOpenCodeAgentsDir } from '../config';
 
 export type InitProfile = 'mvp' | 'full';
 
@@ -200,59 +194,76 @@ const FULL_OPENCODE_AGENTS: Record<string, string> = {
   ),
 };
 
-export function initCommand(profile: InitProfile = 'mvp'): void {
+export interface InitOptions {
+  fullBootstrap?: boolean;
+}
+
+export function initCommand(profile: InitProfile = 'mvp', options?: InitOptions): void {
   const dir = getMoreAgentDir();
+  const isFull = profile === 'full';
+  const modeLabel = isFull ? 'full' : 'mvp';
+  const bootstrapLabel = (options?.fullBootstrap && isFull) ? ' (full-bootstrap)' : '';
 
-  if (fs.existsSync(dir)) {
-    console.log(`.moreagent/ already exists at ${dir}`);
-    ensureOpenCodeAgents(profile);
-    initTasksFile();
-    initRuntimeSessionRegistry();
-    if (configExists()) {
-      console.log('Config already exists. Run "moreagent start" to begin.');
-      return;
-    }
+  console.log(`Initializing MoreAgent project (profile: ${modeLabel}${bootstrapLabel})...\n`);
+
+  const created: string[] = [];
+  const skipped: string[] = [];
+
+  function ensureDir(p: string): void {
+    if (!fs.existsSync(p)) { fs.mkdirSync(p, { recursive: true }); created.push(p); }
   }
 
-  console.log(`Initializing MoreAgent project (profile: ${profile})...`);
-
-  fs.mkdirSync(dir, { recursive: true });
-  fs.mkdirSync(path.join(dir, 'runs'), { recursive: true });
-  fs.mkdirSync(path.join(dir, 'worktrees'), { recursive: true });
-  ensureOpenCodeAgents(profile);
-
-  const configPath = path.join(dir, 'config.yaml');
-  if (!fs.existsSync(configPath)) {
-    fs.writeFileSync(
-      configPath,
-      profile === 'full' ? FULL_CONFIG : MVP_CONFIG,
-      'utf-8'
-    );
+  function ensureFile(p: string, content: string): void {
+    if (!fs.existsSync(p)) { fs.writeFileSync(p, content, 'utf-8'); created.push(p); }
+    else { skipped.push(p); }
   }
 
-  const sessionsPath = path.join(dir, 'sessions.json');
-  if (!fs.existsSync(sessionsPath)) {
-    fs.writeFileSync(
-      sessionsPath,
-      JSON.stringify({ runs: [] }, null, 2),
-      'utf-8'
-    );
+  // Core directories
+  ensureDir(dir);
+  ensureDir(path.join(dir, 'runs'));
+  ensureDir(path.join(dir, 'worktrees'));
+
+  // Config
+  ensureFile(path.join(dir, 'config.yaml'), isFull ? FULL_CONFIG : MVP_CONFIG);
+
+  // State files
+  ensureFile(path.join(dir, 'sessions.json'), JSON.stringify({ runs: [] }, null, 2));
+
+  // Ensure tasks and runtime registry (always try to create if missing)
+  ensureFile(path.join(dir, 'tasks.json'), JSON.stringify({ tasks: [], nextId: 1 }, null, 2));
+  ensureFile(path.join(dir, 'runtime-sessions.json'), JSON.stringify({ provider: 'opencode', agents: {} }, null, 2));
+
+  // Agents
+  const agentsDir = getOpenCodeAgentsDir();
+  ensureDir(agentsDir);
+  const agents = isFull ? FULL_OPENCODE_AGENTS : MVP_OPENCODE_AGENTS;
+  for (const [name, content] of Object.entries(agents)) {
+    ensureFile(path.join(agentsDir, `${name}.md`), content);
   }
 
-  initTasksFile();
-  initRuntimeSessionRegistry();
+  // Integration guide (full only)
+  if (isFull && options?.fullBootstrap) {
+    ensureFile(path.join(dir, 'integration-guide.md'), buildIntegrationGuide());
+  }
 
-  console.log(`\nInitialized at ${dir}`);
-  console.log('Created:');
-  console.log('  config.yaml       — Agent and runtime configuration');
-  console.log('  sessions.json     — Session tracking');
-  console.log('  tasks.json        — Task queue');
-  console.log('  runtime-sessions.json — OpenCode session mappings');
-  console.log('  runs/             — Run output directory');
-  console.log('  worktrees/        — Git worktree directory');
-  console.log('  .opencode/agents/ — OpenCode agent definitions');
-  console.log('\nNext: edit config.yaml with your project details, then run:');
-  console.log('  moreagent start --once --task "your task description"');
+  // Print summary
+  if (created.length > 0) {
+    console.log('Created:');
+    for (const p of created) console.log('  ' + p);
+  }
+  if (skipped.length > 0) {
+    console.log('\nSkipped (already exists):');
+    for (const p of skipped) console.log('  ' + p);
+  }
+
+  console.log('\nNext:');
+  console.log('  1. Review ' + path.join(dir, 'config.yaml'));
+  if (isFull) {
+    console.log('  2. Review ' + path.join(dir, 'integration-guide.md'));
+    console.log('  3. Run: moreagent start --once --task "..."');
+  } else {
+    console.log('  2. Run: moreagent start --once --task "..."');
+  }
 }
 
 function ensureOpenCodeAgents(profile: InitProfile): void {
@@ -268,4 +279,93 @@ function ensureOpenCodeAgents(profile: InitProfile): void {
       fs.writeFileSync(agentPath, content, 'utf-8');
     }
   }
+}
+
+function buildIntegrationGuide(): string {
+  return `# MoreAgent Full Workflow Integration Guide
+
+> Generated by \`moreagent init --full\`. This guide explains how to use the full 9-phase workflow in your project.
+
+## Profile
+
+**profile = full** — Uses brain, product, frontend, backend, tester, and reviewer agents.
+
+## Full Workflow Phases (9)
+
+1. **brain** — Orchestrator analyzes the task and creates high-level plan
+2. **prd** — Product manager writes the Product Requirements Document
+3. **prd-review** — Frontend and backend agents review the PRD
+4. **prd-gate** — Brain reviews PRD feedback and decides APPROVED or CHANGES_REQUESTED
+5. **tech-plan** — Frontend and backend agents create technical plans
+6. **tech-gate** — Brain reviews tech plans and decides APPROVED or CHANGES_REQUESTED
+7. **implementation** — Frontend and backend agents implement features
+8. **test** — Tester runs tests and reports PASS or FAIL
+9. **review** — Reviewer inspects code and decides APPROVED or CHANGES_REQUESTED
+
+## Agent Roles
+
+| Agent | Role | Modifies Code | Primary Artifact |
+|-------|------|---------------|-----------------|
+| brain | Orchestrator / Gate reviewer | No | brain-plan.md, prd-decision.md, tech-review.md |
+| product | Product manager | No | prd.md |
+| frontend | Frontend developer | Yes | frontend-plan.md, frontend-implementation.md |
+| backend | Backend developer | Yes | backend-plan.md, backend-implementation.md |
+| tester | QA engineer | Yes | test-report.md (must include Result: PASS or FAIL) |
+| reviewer | Code reviewer | No | review-report.md (must include Decision: APPROVED or CHANGES_REQUESTED) |
+
+## Recommended Commands
+
+\`\`\`bash
+# Run a single task through the full workflow
+moreagent start --once --task "your task description"
+
+# Resume the latest failed or running workflow
+moreagent start --resume --latest
+
+# Resume a specific run
+moreagent start --resume --run <run-id>
+
+# Check run status
+moreagent status --latest
+moreagent status --run <run-id>
+
+# Get workflow report
+moreagent report --latest
+moreagent report --run <run-id> --json
+
+# Visual dashboard
+moreagent dashboard
+moreagent dashboard --serve
+moreagent dashboard --serve --watch
+\`\`\`
+
+## Directory Structure
+
+| Path | Purpose |
+|------|---------|
+| .moreagent/config.yaml | Agent and runtime configuration |
+| .moreagent/sessions.json | Session tracking (run history) |
+| .moreagent/tasks.json | Task queue |
+| .moreagent/runtime-sessions.json | OpenCode session mappings |
+| .moreagent/runs/ | Per-run artifact output |
+| .moreagent/worktrees/ | Git worktree directories |
+| .moreagent/integration-guide.md | This document |
+| .opencode/agents/ | OpenCode agent definitions |
+
+## Adding to an Existing Project
+
+1. Ensure you have a git repository.
+2. Ensure OpenCode CLI is available in your PATH.
+3. Run \`moreagent init --full\` from the repository root.
+4. Review \`.moreagent/config.yaml\` and adjust agent settings if needed.
+5. Review \`.opencode/agents/*.md\` and customize prompts for your project.
+6. Start with a small task to verify the workflow.
+
+## Safety Notes
+
+- Worktree changes are isolated — agents work in separate git worktrees.
+- No automatic merging — use \`moreagent merge\` to review and apply changes.
+- Re-running \`moreagent init --full\` is safe — existing files are not overwritten.
+- Config and agent files are not overwritten on repeated runs.
+`;
 }

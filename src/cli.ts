@@ -34,7 +34,9 @@ Usage:
   moreagent <command> [options]
 
 Commands:
-  init                      Initialize a new MoreAgent project
+  init                      Initialize a new MoreAgent project (MVP)
+  init --profile full       Initialize with full workflow profile
+  init --full               One-click full workflow integration
   start --once --task <...> Run a task through the agent pipeline
   start --loop              Process all pending tasks in the queue
   queue add --task <...>    Add a task to the queue
@@ -75,6 +77,8 @@ Queue Options:
 
 Examples:
   moreagent init
+  moreagent init --profile full
+  moreagent init --full
   moreagent start --once --task "add user authentication"
   moreagent start --once --task "refactor database layer" --agent implementer
   moreagent start --loop
@@ -118,11 +122,27 @@ async function main(): Promise<void> {
     switch (command) {
       case 'init': {
         const profileIdx = args.indexOf('--profile');
-        const profile: InitProfile =
-          profileIdx !== -1 && args[profileIdx + 1] === 'full'
-            ? 'full'
-            : 'mvp';
-        initCommand(profile);
+        const profileArg = profileIdx !== -1 ? args[profileIdx + 1] : undefined;
+        const useFull = args.includes('--full');
+
+        // --profile value required if flag present
+        if (profileIdx !== -1 && (!profileArg || profileArg.startsWith('-'))) {
+          exitWithError('Error: --profile requires a value (mvp or full)');
+        }
+
+        // Resolve profile
+        let profile: InitProfile = 'mvp';
+        if (profileArg === 'full' || useFull) profile = 'full';
+        if (profileArg && profileArg !== 'mvp' && profileArg !== 'full') {
+          exitWithError('Error: --profile must be mvp or full (got: ' + profileArg + ')');
+        }
+
+        // Conflict: --profile mvp --full
+        if (profileArg === 'mvp' && useFull) {
+          exitWithError('Error: --profile mvp conflicts with --full');
+        }
+
+        initCommand(profile, { fullBootstrap: useFull || profile === 'full' });
         break;
       }
 

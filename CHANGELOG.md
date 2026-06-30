@@ -1,5 +1,17 @@
 # Changelog
 
+## V3.2 (2026-06-30)
+
+### Added — `init --full` One-Click Full Workflow Integration
+- **`moreagent init --full`**: generates full workflow config, 6 agents, state files, and integration guide
+- **`moreagent init --profile full`**: retains backward compatibility, now also generates integration guide
+- **`moreagent init`** (no args): continues to default to MVP profile
+- **CLI validation**: `--profile mvp --full` exits non-zero, `--profile abc` rejected, missing value error
+- **Integration guide** (`.moreagent/integration-guide.md`): 9 phases, 6 roles with artifacts, recommended commands, directory structure, safety notes
+- **Safe idempotency**: re-running `init --full` skips existing files (config, agents, guide); missing files are filled in
+- Refactored `initCommand(profile, options)` with result tracking (created/skipped)
+- 12 new V3.2 tests
+
 ## V3.1 (2026-06-30)
 
 ### Added — Dashboard Serve Usability Hardening
