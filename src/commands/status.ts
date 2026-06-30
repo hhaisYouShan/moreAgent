@@ -41,7 +41,7 @@ export function statusCommand(options: StatusOptions = {}): void {
       return;
     }
     if (options.json) {
-      printJson({ run: buildRunDetail(run) });
+      printJson(options.summary ? { run: buildRunSummary(run) } : { run: buildRunDetail(run) });
       return;
     }
     if (options.summary) {
@@ -63,7 +63,7 @@ export function statusCommand(options: StatusOptions = {}): void {
       return;
     }
     if (options.json) {
-      printJson({ run: buildRunDetail(repairRun) });
+      printJson(options.summary ? { run: buildRunSummary(repairRun) } : { run: buildRunDetail(repairRun) });
       return;
     }
     if (options.summary) {
@@ -87,7 +87,7 @@ export function statusCommand(options: StatusOptions = {}): void {
       return;
     }
     if (options.json) {
-      printJson({ run: buildRunDetail(fullRun) });
+      printJson(options.summary ? { run: buildRunSummary(fullRun) } : { run: buildRunDetail(fullRun) });
       return;
     }
     if (options.summary) {
@@ -100,7 +100,7 @@ export function statusCommand(options: StatusOptions = {}): void {
 
   if (options.latest) {
     if (options.json) {
-      printJson({ run: buildRunDetail(runs[0]) });
+      printJson(options.summary ? { run: buildRunSummary(runs[0]) } : { run: buildRunDetail(runs[0]) });
       return;
     }
     if (options.summary) {

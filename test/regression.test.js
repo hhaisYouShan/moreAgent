@@ -435,6 +435,30 @@ test('JSON: status --run summary --json has canResume/canMerge/gates', () => {
   assert(typeof data.run.canResume === 'boolean', 'canResume not boolean');
   assert(typeof data.run.canMerge === 'boolean', 'canMerge not boolean');
   assert(typeof data.run.gates === 'object', 'gates not object');
+  // summary must NOT contain sessions
+  assert(!data.run.sessions, 'summary should not have sessions');
+  // summary must NOT contain completedPhases/currentPhase
+  assert(!data.run.completedPhases, 'summary should not have completedPhases');
+  assert(typeof data.run.currentPhase === 'undefined' || data.run.currentPhase === undefined,
+    'summary should not have currentPhase');
+});
+
+test('JSON: status --run detail --json has sessions', () => {
+  const r = runCliIn(jsonTestDir, ['status', '--run', 'json-run', '--json']);
+  const data = JSON.parse(r.stdout);
+  assert(Array.isArray(data.run.sessions), 'detail should have sessions array');
+  assert(data.run.sessions.length > 0, 'detail sessions should not be empty');
+});
+
+test('JSON: inspect --agent --json returns UNSUPPORTED', () => {
+  const r = runCliIn(jsonTestDir, ['inspect', '--run', 'json-run', '--agent', 'reviewer', '--json']);
+  assert(r.status !== 0, 'should exit non-zero');
+  const data = JSON.parse(r.stdout);
+  assert(data.error, 'missing error object');
+  assert(data.error.code === 'UNSUPPORTED_JSON_MODE',
+    `expected UNSUPPORTED_JSON_MODE, got ${data.error.code}`);
+  assert(!r.stderr.includes('UNSUPPORTED_JSON_MODE'),
+    'stderr should not contain business error in JSON mode');
 });
 
 test('JSON: durationSeconds is number or null', () => {

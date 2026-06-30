@@ -31,6 +31,9 @@ export function inspectCommand(options: InspectOptions = {}): void {
   }
 
   if (options.agent) {
+    if (options.json) {
+      printJsonError('UNSUPPORTED_JSON_MODE', 'inspect --agent --json is not supported yet.');
+    }
     printAgentArtifact(run, options.agent);
     return;
   }
