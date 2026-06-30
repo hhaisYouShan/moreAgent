@@ -229,8 +229,7 @@ export function initCommand(profile: InitProfile = 'mvp', options?: InitOptions)
   // State files
   ensureFile(path.join(dir, 'sessions.json'), JSON.stringify({ runs: [] }, null, 2));
 
-  // Ensure tasks and runtime registry (always try to create if missing)
-  ensureFile(path.join(dir, 'tasks.json'), JSON.stringify({ tasks: [], nextId: 1 }, null, 2));
+  ensureFile(path.join(dir, 'tasks.json'), JSON.stringify({ tasks: [] }, null, 2));
   ensureFile(path.join(dir, 'runtime-sessions.json'), JSON.stringify({ provider: 'opencode', agents: {} }, null, 2));
 
   // Agents
@@ -241,9 +240,17 @@ export function initCommand(profile: InitProfile = 'mvp', options?: InitOptions)
     ensureFile(path.join(agentsDir, `${name}.md`), content);
   }
 
-  // Integration guide (full only)
+  // Integration guide (full only) — skip if existing config is not full
   if (isFull && options?.fullBootstrap) {
-    ensureFile(path.join(dir, 'integration-guide.md'), buildIntegrationGuide());
+    const configPath = path.join(dir, 'config.yaml');
+    const existingConfig = fs.existsSync(configPath);
+    const configIsFull = existingConfig && fs.readFileSync(configPath, 'utf-8').includes('name: brain');
+    if (existingConfig && !configIsFull) {
+      console.log('\n⚠  Config already exists and is not a full workflow config.');
+      console.log('   Full integration guide skipped — manual migration required.');
+    } else {
+      ensureFile(path.join(dir, 'integration-guide.md'), buildIntegrationGuide());
+    }
   }
 
   // Print summary

@@ -1968,9 +1968,46 @@ test('init: help shows --profile full and --full', () => {
   assert(r.stdout.includes('init --full'), 'help should include --full');
 });
 
-// ============================================================
-// 6. BUILD CHECK
-// ============================================================
+test('init: MVP then --full skips integration guide with warning', () => {
+  const dir = freshGitDir('v32-mvp-then-full');
+  runCliIn(dir, ['init']);
+  const r = runCliIn(dir, ['init', '--full']);
+  assert(r.status === 0, 'should exit 0');
+  // Config should NOT be overwritten
+  const config = fs.readFileSync(path.join(dir, '.moreagent', 'config.yaml'), 'utf-8');
+  assert(config.includes('architect'), 'MVP config should still contain architect');
+  assert(!config.includes('name: brain'), 'MVP config should NOT contain brain');
+  // No misleading full integration guide
+  const guidePath = path.join(dir, '.moreagent', 'integration-guide.md');
+  if (fs.existsSync(guidePath)) {
+    const guide = fs.readFileSync(guidePath, 'utf-8');
+    assert(!guide.includes('profile = full') || guide.includes('config was not overwritten'), 'guide should warn about mixed state');
+  }
+  // Should have warning in output
+  const out = r.stdout + (r.stderr || '');
+  assert(out.includes('skipped') || out.includes('Config already exists') || out.includes('manual migration'), `should warn, got: ${out.slice(0,300)}`);
+});
+
+test('init: existing config but missing tasks/runtime fills in', () => {
+  const dir = freshGitDir('v32-fill');
+  runCliIn(dir, ['init', '--full']);
+  // Delete tasks and runtime-sessions
+  fs.unlinkSync(path.join(dir, '.moreagent', 'tasks.json'));
+  fs.unlinkSync(path.join(dir, '.moreagent', 'runtime-sessions.json'));
+  // Re-run init
+  runCliIn(dir, ['init', '--full']);
+  assert(fs.existsSync(path.join(dir, '.moreagent', 'tasks.json')), 'tasks.json should be recreated');
+  assert(fs.existsSync(path.join(dir, '.moreagent', 'runtime-sessions.json')), 'runtime-sessions.json should be recreated');
+});
+
+test('init: tasks.json has correct structure { tasks: [] }', () => {
+  const dir = freshGitDir('v32-tasks');
+  runCliIn(dir, ['init', '--full']);
+  const tasks = JSON.parse(fs.readFileSync(path.join(dir, '.moreagent', 'tasks.json'), 'utf-8'));
+  assert(Array.isArray(tasks.tasks), 'tasks should be an array');
+  assert(tasks.tasks.length === 0, 'tasks should be empty');
+  assert(!('nextId' in tasks), 'tasks should not have nextId');
+});
 
 console.log('\n6. Build Check');
 console.log('==============');
