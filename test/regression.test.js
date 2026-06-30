@@ -1344,7 +1344,6 @@ test('Dashboard: open failure keeps exit 0 and HTML exists', () => {
   writeSessions(dashDir, { runs: [{ id: 'dash-open-fail', task: 'fail test', status: 'completed', createdAt: '2024-01-01T00:00:00Z', artifactDir: path.join(dashDir, '.moreagent', 'runs', 'dash-open-fail'), sessions: [] }] });
 
   const outP = path.join(TMP, 'open-fail.html');
-  // Use an env var to make open command fail
   const r = spawnSync('node', [CLI, 'dashboard', '--output', outP, '--open'], {
     cwd: dashDir, encoding: 'utf-8', timeout: 10000,
     env: { ...process.env, MOREAGENT_DASHBOARD_OPEN_COMMAND: 'false' },
@@ -1352,7 +1351,16 @@ test('Dashboard: open failure keeps exit 0 and HTML exists', () => {
 
   assert(r.status === 0, `open failure should still exit 0, got ${r.status}`);
   assert(fs.existsSync(outP), 'HTML should exist even when open fails');
-  assert(r.stdout.includes('Open failed') || r.stdout.includes('Dashboard written'), 'should mention open failure or written path');
+  assert(r.stdout.includes('Open failed'), `should print Open failed, got: ${r.stdout.slice(0,300)}`);
+  assert(r.stdout.includes('Dashboard was still generated at'), `should print fallback path, got: ${r.stdout.slice(0,300)}`);
+});
+
+test('Helper: openInDefaultBrowser returns ok:false for non-zero exit', () => {
+  const prev = process.env.MOREAGENT_DASHBOARD_OPEN_COMMAND;
+  process.env.MOREAGENT_DASHBOARD_OPEN_COMMAND = 'false';
+  const result = __dashboardTestHooks.openInDefaultBrowser('/tmp/nonexistent.html');
+  process.env.MOREAGENT_DASHBOARD_OPEN_COMMAND = prev;
+  assert(result.ok === false, `should return ok false when open command fails, got ${JSON.stringify(result)}`);
 });
 
 test('Dashboard: --open appears in CLI help', () => {

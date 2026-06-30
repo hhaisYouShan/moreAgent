@@ -832,6 +832,10 @@ export function openInDefaultBrowser(filePath: string): { ok: true } | { ok: fal
   try {
     const result = spawnSync(cmd, args, { timeout: 10000, encoding: 'utf-8' });
     if (result.error) return { ok: false, message: result.error.message };
+    if (result.status !== 0) {
+      const detail = (result.stderr || result.stdout || '').trim();
+      return { ok: false, message: detail || `open command exited with code ${result.status}` };
+    }
     return { ok: true };
   } catch (e: any) {
     return { ok: false, message: e.message || 'Unknown error' };
