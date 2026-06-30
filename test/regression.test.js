@@ -1131,6 +1131,119 @@ test('Dashboard: MVP run still shows workflow unavailable', () => {
 });
 
 // ============================================================
+// 7d. V2.2 Dashboard Resilience
+// ============================================================
+
+console.log('\n7d. Dashboard Resilience (V2.2)');
+console.log('===============================');
+
+const { __dashboardTestHooks } = require('../dist/commands/dashboard');
+const { safeText, safeBool, getNested, normalizeDecision, normalizeMerge, normalizeWorktree, normalizeGates, normalizeSessions } = __dashboardTestHooks;
+
+// --- E2E tests ---
+
+test('Dashboard: no runs renders empty state (exit 0)', () => {
+  const dir = path.join(TMP, 'dash-empty');
+  fs.mkdirSync(dir, { recursive: true });
+  execSync('git init', { cwd: dir, stdio: 'pipe' });
+  fs.mkdirSync(path.join(dir, '.moreagent', 'runs'), { recursive: true });
+  fs.writeFileSync(path.join(dir, '.moreagent', 'sessions.json'), JSON.stringify({ runs: [] }));
+
+  const r = runCliIn(dir, ['dashboard', '--output', path.join(TMP, 'dash-empty.html')]);
+  assert(r.status === 0, `empty dashboard should exit 0, got ${r.status}`);
+  const html = fs.readFileSync(path.join(TMP, 'dash-empty.html'), 'utf-8');
+  assert(html.includes('No runs found'), 'should contain No runs found');
+  assert(html.includes('moreagent start'), 'should contain CLI suggestion');
+});
+
+test('Dashboard: empty sessions show No session data recorded', () => {
+  const runId = 'dash-v22-empty-sess';
+  writeSessions(dashDir, { runs: [{
+    id: runId, task: 'no sessions', status: 'completed',
+    createdAt: '2024-01-01T00:00:00Z',
+    artifactDir: path.join(dashDir, '.moreagent', 'runs', runId),
+    sessions: [],
+  }] });
+
+  const r = runCliIn(dashDir, ['dashboard', '--run', runId, '--output', path.join(TMP, 'dash-v22-empty-sess.html')]);
+  const html = fs.readFileSync(path.join(TMP, 'dash-v22-empty-sess.html'), 'utf-8');
+  assert(html.includes('No session data recorded'), 'should show No session data recorded');
+});
+
+test('Dashboard: main UI contains no undefined or [object Object]', () => {
+  const runId = 'dash-v22-safe';
+  writeSessions(dashDir, { runs: [{
+    id: runId, task: 'safety test', status: 'completed',
+    createdAt: '2024-01-01T00:00:00Z',
+    artifactDir: path.join(dashDir, '.moreagent', 'runs', runId),
+    sessions: [
+      { id: 's-1', agentName: 'tester', status: 'completed', artifactDir: path.join(dashDir, '.moreagent', 'runs', runId, 'tester'), startedAt: '2024-01-01T00:00:00Z', runId },
+    ],
+  }] });
+
+  const r = runCliIn(dashDir, ['dashboard', '--run', runId, '--output', path.join(TMP, 'dash-v22-safe.html')]);
+  const html = fs.readFileSync(path.join(TMP, 'dash-v22-safe.html'), 'utf-8');
+
+  // Exclude data script section, check only rendered HTML
+  var mainStart = html.indexOf('<div id="main">');
+  var scriptStart = html.indexOf('<script>', mainStart);
+  var renderedHtml = html.slice(mainStart, scriptStart > 0 ? scriptStart : html.length);
+
+  // Check for unsafe patterns in rendered area (not in data/script)
+  assert(!renderedHtml.includes('>undefined<'), 'rendered UI should not contain undefined');
+  assert(!renderedHtml.includes('[object Object]'), 'rendered UI should not contain [object Object]');
+});
+
+// --- Helper tests (via __dashboardTestHooks) ---
+
+test('Helper: safeText returns fallback for null/undefined/empty', () => {
+  assert(safeText(null, 'NA') === 'NA');
+  assert(safeText(undefined, 'NA') === 'NA');
+  assert(safeText('', 'NA') === 'NA');
+  assert(safeText('hello', 'NA') === 'hello');
+  assert(safeText(42, 'NA') === '42');
+});
+
+test('Helper: safeBool returns null for non-boolean values', () => {
+  assert(safeBool(true) === true);
+  assert(safeBool(false) === false);
+  assert(safeBool(null) === null);
+  assert(safeBool(undefined) === null);
+  assert(safeBool('true') === null);
+});
+
+test('Helper: getNested traverses safely', () => {
+  const obj = { a: { b: { c: 'val' } } };
+  assert(getNested(obj, ['a', 'b', 'c'], 'fb') === 'val');
+  assert(getNested(obj, ['a', 'x', 'c'], 'fb') === 'fb');
+  assert(getNested(null, ['a'], 'fb') === 'fb');
+});
+
+test('Helper: normalizeDecision returns isMissing for missing decision', () => {
+  const result = normalizeDecision(null);
+  assert(result.isMissing === true);
+  assert(result.overallStatus === 'unknown');
+});
+
+test('Helper: normalizeMerge returns isMissing for missing merge', () => {
+  const result = normalizeMerge(null);
+  assert(result.isMissing === true);
+  assert(result.canMerge === null);
+});
+
+test('Helper: normalizeWorktree returns isMissing for missing worktree', () => {
+  const result = normalizeWorktree(null);
+  assert(result.isMissing === true);
+  assert(result.path === 'Not available');
+});
+
+test('Helper: normalizeSessions returns unavailable for missing sessions', () => {
+  assert(normalizeSessions(null).state === 'unavailable');
+  assert(normalizeSessions({ run: {} }).state === 'unavailable');
+  assert(normalizeSessions({ run: { sessions: [] } }).state === 'empty');
+});
+
+// ============================================================
 // 6. BUILD CHECK
 // ============================================================
 

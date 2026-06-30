@@ -79,14 +79,26 @@ function callMoreagentJson(args: string[]): { data: any } | { error: string; err
 function buildDashboardModel(selectedRun?: string, limit: number = DEFAULT_LIMIT): DashboardModel | null {
   const listResult = callMoreagentJson(['status', '--json']);
   if ('error' in listResult) {
+    if (listResult.errorCode === 'NO_RUNS') {
+      return {
+        generatedAt: new Date().toISOString(),
+        selectedRunId: null,
+        runs: [],
+        runDetailsById: {},
+      };
+    }
     console.error(`Error fetching runs: ${listResult.error}`);
     return null;
   }
 
   const allRuns: any[] = (listResult.data.runs || []);
   if (allRuns.length === 0) {
-    console.log('No runs found.');
-    return null;
+    return {
+      generatedAt: new Date().toISOString(),
+      selectedRunId: null,
+      runs: [],
+      runDetailsById: {},
+    };
   }
 
   const prefetchedRuns = allRuns.slice(0, limit);
@@ -168,6 +180,7 @@ function serializeJsonForScript(value: any): string {
 function renderDashboardHtml(model: DashboardModel): string {
   const dataJson = serializeJsonForScript(model);
   const selectedId = model.selectedRunId || (model.runs[0]?.id ?? '');
+  const isEmpty = model.runs.length === 0;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -268,7 +281,7 @@ td{padding:6px 8px;border-bottom:1px solid #21262d}
   <div id="run-list"></div>
 </div>
 <div id="main">
-  <div id="main-content"></div>
+  ${isEmpty ? '<div style="text-align:center;padding:80px 32px"><h2 style="color:#8b949e;font-size:20px">No runs found</h2><p style="color:#6e7681;margin-top:12px;font-size:14px">Run a task first: <code style="background:#21262d;padding:2px 8px;border-radius:4px;font-size:13px">moreagent start --once --task "..."</code></p></div>' : '<div id="main-content"></div>'}
 </div>
 
 <script>
@@ -280,6 +293,74 @@ window.__MOREAGENT_DASHBOARD_DATA__ = ${dataJson};
   var currentFilter = 'all';
 
   var FULL_PHASES = ['brain','prd','prd-review','prd-gate','tech-plan','tech-gate','implementation','test','review'];
+
+  // ---- Safe ViewModel helpers (browser-side) ----
+  function safeText(v, fb) { if (v===null||v===undefined||v==='') return fb; if (typeof v==='string') return v.trim()||fb; if (typeof v==='number'||typeof v==='boolean') return String(v); return fb; }
+  function safeBool(v) { if (v===true) return true; if (v===false) return false; return null; }
+  function getNested(obj, path, fb) { var c=obj; for (var i=0;i<path.length;i++){ if (c===null||c===undefined||typeof c!=='object') return fb; if (!(path[i] in c)) return fb; c=c[path[i]]; } return c; }
+
+  function buildSafeViewModel(run, details) {
+    var report = (details&&details.report&&details.report.report) ? details.report.report : null;
+    var nDec = normalizeDecision(report);
+    var nMerge = normalizeMerge(report);
+    var nWt = normalizeWorktree(report);
+    var nGates = normalizeGates(report);
+    var nSess = normalizeSessions(details ? details.status : null);
+    var isFull = run.workflow ? run.workflow.profile==='full' : (run.profile==='full');
+    var wfMode = 'unavailable';
+    if (details&&details.workflowError&&details.workflowError.code==='NOT_FULL_WORKFLOW'&&!isFull) wfMode='mvp_degradation';
+    else if (details&&details.workflowError) wfMode='full_error';
+    else if (details&&details.workflow&&!details.workflowError) wfMode='full_ok';
+    return { runId: safeText(run.id,'N/A'), taskText: safeText(run.task,'Untitled task'), statusText: safeText(run.status,'unknown'),
+      overallStatusText: nDec.overallStatus, recommendationText: nDec.recommendation,
+      canResumeText: nDec.canResume===true?'yes':nDec.canResume===false?'no':'N/A',
+      canMergeText: nMerge.canMerge===true?'yes':nMerge.canMerge===false?'no':'N/A',
+      mainCleanText: nMerge.mainClean===true?'yes':nMerge.mainClean===false?'no':'N/A',
+      worktreeExistsText: nWt.exists===true?'yes':nWt.exists===false?'no':'N/A',
+      profileText: safeText(run.workflow?run.workflow.profile:run.profile,'mvp'),
+      decisionMissing: nDec.isMissing, mergeMissing: nMerge.isMissing,
+      statusError: details&&details.statusError,
+      reportError: details&&details.reportError,
+      workflowError: details&&details.workflowError,
+      wfMode: wfMode, gates: nGates, merge: nMerge, worktree: nWt,
+      nSess: nSess,
+      sessions: (details&&details.status&&details.status.run)?(details.status.run.sessions||[]):[],
+      test: safeText(nGates.test,'unknown'), review: safeText(nGates.review,'unknown'),
+      hasRepair: report?(!!report.quality&&report.quality.hasRepair===true):false,
+      repairCount: report?(report.quality?report.quality.repairCount:0):0,
+      repairRounds: report?(report.quality?report.quality.repairRounds:0):0,
+      completedPhases: report?(report.workflow?report.workflow.completedPhases||[]:[]):[],
+      failedPhase: report?(report.workflow?report.workflow.failedPhase||null:null):null,
+      totalPhases: report?(report.workflow?report.workflow.totalPhases:FULL_PHASES.length):FULL_PHASES.length,
+      completedCount: report?(report.workflow?report.workflow.completedCount:0):0,
+    };
+  }
+
+  function normalizeDecision(report) {
+    var d = report ? report.decision : null;
+    if (!d) return { overallStatus:'unknown', recommendation:'unknown', canResume:null, isMissing:true };
+    return { overallStatus:safeText(d.overallStatus,'unknown'), recommendation:safeText(d.recommendation,'unknown'), canResume:safeBool(d.canResume), isMissing:false };
+  }
+  function normalizeMerge(report) {
+    var m = report ? report.merge : null;
+    if (!m) return { canMerge:null, mainClean:null, blockedReason:'', mainDirtyFiles:[], isMissing:true };
+    return { canMerge:safeBool(m.canMerge), mainClean:safeBool(m.mainClean), blockedReason:safeText(m.blockedReason,''), mainDirtyFiles:Array.isArray(m.mainDirtyFiles)?m.mainDirtyFiles.filter(Boolean):[], isMissing:false };
+  }
+  function normalizeWorktree(report) {
+    var w = report ? report.worktree : null;
+    if (!w) return { exists:null, path:'Not available', branch:'Not available', isMissing:true };
+    return { exists:safeBool(w.exists), path:safeText(w.path,'Not available'), branch:safeText(w.branch,'Not available'), isMissing:false };
+  }
+  function normalizeGates(report) {
+    if (!report) return { prdGate:'unknown', techGate:'unknown', test:'unknown', review:'unknown' };
+    return { prdGate:safeText(report.gates?report.gates.prdGate:'','unknown'), techGate:safeText(report.gates?report.gates.techGate:'','unknown'), test:safeText(report.quality?report.quality.test:'','unknown'), review:safeText(report.quality?report.quality.review:'','unknown') };
+  }
+  function normalizeSessions(statusRun) {
+    var sessions = statusRun&&statusRun.run ? statusRun.run.sessions : null;
+    if (!sessions) return { state:'unavailable', message:'Sessions unavailable' };
+    if (!Array.isArray(sessions)||sessions.length===0) return { state:'empty', message:'No session data recorded' };
+    return { state:'ok', message:null };
+  }
 
   function getRunBrief(runId) {
     var r = D.runs.find(function(x){return x.id===runId;});
@@ -353,57 +434,62 @@ window.__MOREAGENT_DASHBOARD_DATA__ = ${dataJson};
     var details = getDetails(currentRunId);
     if (!brief) { document.getElementById('main-content').innerHTML='<div class="section"><div class="section-body"><div class="error-box">Run not found</div></div></div>'; return; }
 
-    var report = (details&&details.report&&details.report.report) ? details.report.report : null;
-    var decision = report ? report.decision : null;
-    var statusRun = (details&&details.status&&details.status.run) ? details.status.run : null;
-    var sessions = statusRun ? (statusRun.sessions||[]) : [];
-    var workflowInfo = brief.workflow||(statusRun&&statusRun.workflow)||{};
-    var isFull = (workflowInfo.profile==='full');
+    var safe = buildSafeViewModel(brief, details);
+    var sessions = safe.sessions;
+    var isFull = safe.profileText==='full';
 
     var html = '';
 
     // A. Enhanced Summary
     html += '<div class="section"><div class="section-title">Overall Status</div><div class="section-body">';
-    if (!isFull && details&&details.workflowError&&details.workflowError.code==='NOT_FULL_WORKFLOW'){
-      html += '<div class="mvp-banner">workflow unavailable \u2014 MVP run</div>';
+    if (safe.statusError) {
+      html += '<div class="error-box">Detail unavailable</div>';
+    }
+    if (safe.reportError) {
+      html += '<div class="error-box">Report unavailable</div>';
+    }
+    if (safe.wfMode==='mvp_degradation'){
+      html += '<div class="mvp-banner">Workflow unavailable \u2014 MVP run</div>';
+    } else if (safe.wfMode==='full_error'){
+      html += '<div class="mvp-banner" style="background:#da363320;border-color:#da3633;color:#f85149">Workflow unavailable \u2014 Workflow data could not be loaded for this full workflow run</div>';
     }
 
-    if (decision) {
+    if (!safe.decisionMissing) {
       html += '<div class="summary-hero">'+
-        '<div class="hero-status" style="color:'+statusColor(decision.overallStatus)+'">'+esc(decision.overallStatus)+'</div>'+
-        '<div class="hero-recommendation" style="color:'+recColor(decision.recommendation)+'">'+esc(decision.recommendation)+'</div>'+
+        '<div class="hero-status" style="color:'+statusColor(safe.overallStatusText)+'">'+esc(safe.overallStatusText)+'</div>'+
+        '<div class="hero-recommendation" style="color:'+recColor(safe.recommendationText)+'">'+esc(safe.recommendationText)+'</div>'+
         '</div>';
       html += '<div class="summary-pills">'+
-        pill(decision.canResume,'Can Resume')+
-        pill(report.merge.canMerge,'Can Merge')+
-        pill(report.merge.mainClean,'Main Clean')+
-        pill(report.worktree.exists,'Worktree Exists')+
+        pill(safe.canResumeText==='yes','Can Resume')+
+        pill(safe.canMergeText==='yes','Can Merge')+
+        pill(safe.mainCleanText==='yes','Main Clean')+
+        pill(safe.worktreeExistsText==='yes','Worktree Exists')+
         '</div>';
-    } else if (brief) {
-      html += '<div class="summary-hero"><div class="hero-status" style="color:#8b949e">'+esc(brief.status||'N/A')+'</div></div>';
+    } else {
+      html += '<div class="error-box">Missing decision data</div>';
     }
 
-    html += '<div style="font-size:12px;color:#8b949e">Run ID: '+esc(brief.id)+' &middot; Task: '+esc(brief.task||'N/A')+' &middot; Profile: '+esc(workflowInfo.profile||'mvp')+'</div>';
+    html += '<div style="font-size:12px;color:#8b949e">Run ID: '+esc(safe.runId)+' &middot; Task: '+esc(safe.taskText)+' &middot; Profile: '+esc(safe.profileText)+'</div>';
     html += '</div></div>';
 
     // B. Workflow Report
     html += '<div class="section"><div class="section-title">Workflow Report</div><div class="section-body">';
-    if (details&&details.workflowError) {
-      html += '<div class="mvp-banner">'+esc(details.workflowError.message||'workflow unavailable')+'</div>';
-    }
-    var wf = (details&&details.workflow&&details.workflow.run) ? details.workflow.run : null;
-    var reportWf = report ? report.workflow : null;
-    var completedPhases = reportWf ? (reportWf.completedPhases||[]) : (wf?(wf.completedPhases||[]):[]);
-    var failedPhase = reportWf ? reportWf.failedPhase : (wf?wf.failedPhase:null);
-    var totalPhases = reportWf ? reportWf.totalPhases : FULL_PHASES.length;
-    var completedCount = reportWf ? reportWf.completedCount : completedPhases.length;
+    if (safe.wfMode==='mvp_degradation'){
+      html += '<div class="mvp-banner">Workflow unavailable \u2014 MVP run</div>';
+    } else if (safe.wfMode==='full_error'){
+      html += '<div class="mvp-banner" style="background:#da363320;border-color:#da3633;color:#f85149">Workflow unavailable \u2014 Workflow data could not be loaded</div>';
+    } else {
+      var completedPhases = safe.completedPhases;
+      var failedPhase = safe.failedPhase;
+      var totalPhases = safe.totalPhases;
+      var completedCount = safe.completedCount;
 
-    html += '<div class="row">'+
-      '<div class="col"><div class="label">Completed</div><div class="value">'+completedCount+' / '+totalPhases+'</div></div>'+
-      (failedPhase?'<div class="col"><div class="label">Failed Phase</div><div class="value" style="color:#f85149">'+esc(failedPhase)+'</div></div>':'')+
-      '</div>';
+      html += '<div class="row">'+
+        '<div class="col"><div class="label">Completed</div><div class="value">'+completedCount+' / '+totalPhases+'</div></div>'+
+        (failedPhase?'<div class="col"><div class="label">Failed Phase</div><div class="value" style="color:#f85149">'+esc(failedPhase)+'</div></div>':'')+
+        '</div>';
 
-    if (completedPhases.length>0||failedPhase){
+      if (completedPhases.length>0||failedPhase){
       html += '<div class="phase-bar">';
       for (var p=0;p<FULL_PHASES.length;p++){
         var ph = FULL_PHASES[p];
@@ -417,22 +503,25 @@ window.__MOREAGENT_DASHBOARD_DATA__ = ${dataJson};
     html += '</div></div>';
 
     // C. Gate / Test / Review
-    var gates = report ? (report.gates||{}) : {};
-    var quality = report ? (report.quality||{}) : {};
     html += '<div class="section"><div class="section-title">Gate / Test / Review</div><div class="section-body">';
-    html += '<div class="gate-grid">'+
-      gateCard('PRD Gate',gates.prdGate||'unknown')+
-      gateCard('Tech Gate',gates.techGate||'unknown')+
-      gateCard('Test',quality.test||'unknown')+
-      gateCard('Review',quality.review||'unknown')+
-      '</div></div></div>';
+    if (safe.reportError) {
+      html += '<div class="error-box">Report unavailable</div>';
+    } else {
+      html += '<div class="gate-grid">'+
+        gateCard('PRD Gate',safe.gates.prdGate)+
+        gateCard('Tech Gate',safe.gates.techGate)+
+        gateCard('Test',safe.gates.test)+
+        gateCard('Review',safe.gates.review)+
+        '</div>';
+    }
+    html += '</div></div>';
 
     // D. Repair Sessions
     html += '<div class="section"><div class="section-title">Repair Sessions</div><div class="section-body">';
-    if (quality.hasRepair){
+    if (safe.hasRepair){
       html += '<div class="row">'+
-        '<div class="col"><div class="label">Repair Count</div><div class="value">'+(quality.repairCount||0)+'</div></div>'+
-        '<div class="col"><div class="label">Repair Rounds</div><div class="value">'+(quality.repairRounds||0)+'</div></div>'+
+        '<div class="col"><div class="label">Repair Count</div><div class="value">'+(safe.repairCount||0)+'</div></div>'+
+        '<div class="col"><div class="label">Repair Rounds</div><div class="value">'+(safe.repairRounds||0)+'</div></div>'+
         '</div>';
     } else {
       html += '<div class="empty-box">No repair sessions</div>';
@@ -440,27 +529,32 @@ window.__MOREAGENT_DASHBOARD_DATA__ = ${dataJson};
     html += '</div></div>';
 
     // E. Merge Readiness
-    var merge = report ? (report.merge||{}) : {};
-    var wt = report ? (report.worktree||{}) : {};
     html += '<div class="section"><div class="section-title">Merge Readiness</div><div class="section-body">';
+    if (safe.mergeMissing) {
+      html += '<div class="error-box">Merge readiness unavailable</div>';
+    } else {
+      var mergeExplain = buildMergeExplanation({overallStatus:safe.overallStatusText,recommendation:safe.recommendationText},{canMerge:safe.merge.canMerge,mainClean:safe.merge.mainClean,blockedReason:safe.merge.blockedReason},{exists:safe.worktree.exists});
+      html += '<div class="merge-explain '+((safe.recommendationText==='MERGE_READY')?'ready':'blocked')+'">'+esc(mergeExplain)+'</div>';
 
-    var mergeExplain = buildMergeExplanation(decision, merge, wt);
-    html += '<div class="merge-explain '+((decision&&decision.recommendation==='MERGE_READY')?'ready':'blocked')+'">'+esc(mergeExplain)+'</div>';
-
-    html += '<div class="row" style="margin-top:12px">'+
-      '<div class="col"><div class="label">Can Merge</div><div class="value '+(merge.canMerge?'merge-ok':'merge-no')+'">'+(merge.canMerge?'yes':'no')+(merge.blockedReason?' ('+esc(merge.blockedReason)+')':'')+'</div></div>'+
-      '<div class="col"><div class="label">Main Clean</div><div class="value '+(merge.mainClean?'merge-ok':'merge-no')+'">'+(merge.mainClean?'yes':'no')+'</div></div>'+
-      '<div class="col"><div class="label">Worktree</div><div class="value">'+(wt.path||'none')+(wt.branch?' ('+esc(wt.branch)+')':'')+'</div></div>'+
-      '</div>';
-    if (!merge.mainClean&&merge.mainDirtyFiles&&merge.mainDirtyFiles.length>0){
-      html += '<div class="label" style="margin-top:8px">Dirty Files</div>';
-      html += '<div class="value">'+merge.mainDirtyFiles.map(function(f){return esc(f);}).join('<br>')+'</div>';
+      html += '<div class="row" style="margin-top:12px">'+
+        '<div class="col"><div class="label">Can Merge</div><div class="value '+(safe.merge.canMerge===true?'merge-ok':'merge-no')+'">'+(safe.merge.canMerge===true?'yes':safe.merge.canMerge===false?'no':'N/A')+(safe.merge.blockedReason?' ('+esc(safe.merge.blockedReason)+')':'')+'</div></div>'+
+        '<div class="col"><div class="label">Main Clean</div><div class="value '+(safe.merge.mainClean===true?'merge-ok':'merge-no')+'">'+(safe.merge.mainClean===true?'yes':safe.merge.mainClean===false?'no':'N/A')+'</div></div>'+
+        '<div class="col"><div class="label">Worktree</div><div class="value">'+esc(safe.worktree.path)+' '+(safe.worktree.branch!=='Not available'?'('+esc(safe.worktree.branch)+')':'')+'</div></div>'+
+        '</div>';
+      if (safe.merge.mainClean===false&&safe.merge.mainDirtyFiles.length>0){
+        html += '<div class="label" style="margin-top:8px">Dirty Files</div>';
+        html += '<div class="value">'+safe.merge.mainDirtyFiles.map(function(f){return esc(f);}).join('<br>')+'</div>';
+      }
     }
     html += '</div></div>';
 
     // F. Sessions
     html += '<div class="section"><div class="section-title">Sessions</div><div class="section-body">';
-    if (sessions.length>0){
+    if (safe.nSess.state==='unavailable') {
+      html += '<div class="error-box">Sessions unavailable</div>';
+    } else if (safe.nSess.state==='empty') {
+      html += '<div class="empty-box">No session data recorded</div>';
+    } else if (sessions.length>0){
       html += '<table><thead><tr><th>Agent</th><th>Status</th><th>Duration</th><th>Artifact Dir</th><th>Worktree</th></tr></thead><tbody>';
       for (var s=0;s<sessions.length;s++){
         var ss = sessions[s];
@@ -472,10 +566,10 @@ window.__MOREAGENT_DASHBOARD_DATA__ = ${dataJson};
           }catch(e){}
         }
         html += '<tr>'+
-          '<td>'+esc(ss.agentName||'')+'</td>'+
-          '<td>'+esc(ss.status||'')+'</td>'+
-          '<td>'+esc(dur)+'</td>'+
-          '<td style="font-size:10px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(ss.artifactDir||'')+'</td>'+
+          '<td>'+esc(safeText(ss.agentName,'N/A'))+'</td>'+
+          '<td>'+esc(safeText(ss.status,'N/A'))+'</td>'+
+          '<td>'+esc(dur||'N/A')+'</td>'+
+          '<td style="font-size:10px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(safeText(ss.artifactDir,'Not available'))+'</td>'+
           '<td style="font-size:10px">'+(ss.worktreePath?'yes':'')+'</td>'+
           '</tr>';
       }
@@ -623,3 +717,82 @@ function writeDashboardHtml(outputPath: string, html: string): void {
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(outputPath, html, 'utf-8');
 }
+
+// ---- Safe helpers (exported via __dashboardTestHooks for testing) ----
+
+export function safeText(value: unknown, fallback: string): string {
+  if (value === null || value === undefined || value === '') return fallback;
+  if (typeof value === 'string') return value.trim() || fallback;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return fallback;
+}
+
+export function safeBool(value: unknown): true | false | null {
+  if (value === true) return true;
+  if (value === false) return false;
+  return null;
+}
+
+export function getNested<T>(obj: unknown, path: string[], fallback: T): T {
+  let current: any = obj;
+  for (const key of path) {
+    if (current === null || current === undefined || typeof current !== 'object') return fallback;
+    if (!(key in current)) return fallback;
+    current = current[key];
+  }
+  return current as T;
+}
+
+export function normalizeDecision(report: any): {
+  overallStatus: string; recommendation: string; canResume: boolean | null; isMissing: boolean;
+} {
+  const d: any = getNested(report, ['report', 'decision'], null);
+  if (!d) return { overallStatus: 'unknown', recommendation: 'unknown', canResume: null, isMissing: true };
+  return { overallStatus: safeText(d.overallStatus, 'unknown'), recommendation: safeText(d.recommendation, 'unknown'), canResume: safeBool(d.canResume), isMissing: false };
+}
+
+export function normalizeMerge(report: any): {
+  canMerge: boolean | null; mainClean: boolean | null; blockedReason: string; mainDirtyFiles: string[]; isMissing: boolean;
+} {
+  const m: any = getNested(report, ['report', 'merge'], null);
+  if (!m) return { canMerge: null, mainClean: null, blockedReason: '', mainDirtyFiles: [], isMissing: true };
+  return { canMerge: safeBool(m.canMerge), mainClean: safeBool(m.mainClean), blockedReason: safeText(m.blockedReason, ''), mainDirtyFiles: Array.isArray(m.mainDirtyFiles) ? m.mainDirtyFiles.filter(Boolean) : [], isMissing: false };
+}
+
+export function normalizeWorktree(report: any): {
+  exists: boolean | null; path: string; branch: string; isMissing: boolean;
+} {
+  const w: any = getNested(report, ['report', 'worktree'], null);
+  if (!w) return { exists: null, path: 'Not available', branch: 'Not available', isMissing: true };
+  return { exists: safeBool(w.exists), path: safeText(w.path, 'Not available'), branch: safeText(w.branch, 'Not available'), isMissing: false };
+}
+
+export function normalizeGates(report: any): { prdGate: string; techGate: string; test: string; review: string } {
+  const g: any = getNested(report, ['report', 'gates'], null);
+  return { prdGate: safeText(g?.prdGate, 'unknown'), techGate: safeText(g?.techGate, 'unknown'), test: safeText(g?.test, 'unknown'), review: safeText(g?.review, 'unknown') };
+}
+
+export function normalizeSessions(statusRun: any): { state: 'ok' | 'empty' | 'unavailable'; message: string | null } {
+  const sessions: any = getNested(statusRun, ['run', 'sessions'], null);
+  if (!sessions) return { state: 'unavailable', message: 'Sessions unavailable' };
+  if (!Array.isArray(sessions) || sessions.length === 0) return { state: 'empty', message: 'No session data recorded' };
+  return { state: 'ok', message: null };
+}
+
+export function renderErrorBox(title: string, error: { code?: string; message?: string } | null): string {
+  if (!error) return `<div class="error-box">${title}</div>`;
+  return `<div class="error-box"><strong>${title}</strong><br>Code: ${safeText(error.code, 'N/A')}<br>Message: ${safeText(error.message, 'No details')}</div>`;
+}
+
+export function renderEmptyState(type: string): string {
+  if (type === 'no_runs') return '<div class="empty-box" style="text-align:center;padding:40px"><h2 style="color:#8b949e">No runs found</h2><p style="color:#6e7681;margin-top:8px">Run a task first: <code style="background:#21262d;padding:2px 6px;border-radius:3px">moreagent start --once --task "..."</code></p></div>';
+  if (type === 'no_sessions') return '<div class="empty-box">No session data recorded</div>';
+  if (type === 'detail_unavailable') return '<div class="error-box">Detail unavailable</div>';
+  return '<div class="empty-box">Not available</div>';
+}
+
+export const __dashboardTestHooks = {
+  safeText, safeBool, getNested,
+  normalizeDecision, normalizeMerge, normalizeWorktree, normalizeGates, normalizeSessions,
+  renderErrorBox, renderEmptyState,
+};

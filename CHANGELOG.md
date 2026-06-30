@@ -1,5 +1,24 @@
 # Changelog
 
+## V2.2 (2026-06-30)
+
+### Added — Dashboard Resilience
+- **Empty dashboard**: no runs generates empty state HTML (exit 0) with "No runs found" and CLI suggestion
+- **NO_RUNS error code**: treated as empty state, not fatal error
+- **Safe ViewModel layer**: browser-side `buildSafeViewModel()` normalizes all data before UI rendering, preventing `undefined`/`null`/`[object Object]` in main UI
+- **Safe helpers**: `safeText()`, `safeBool()`, `getNested()` — unified fallback logic for all data fields
+- **Normalizers**: `normalizeDecision()`, `normalizeMerge()`, `normalizeWorktree()`, `normalizeGates()`, `normalizeSessions()` — structured fallback with `isMissing` flags
+- **Error display**: `renderErrorBox()` for status/report/workflow errors with code and message
+- **Fallback text**: Detail unavailable, Report unavailable, Missing decision data, Merge readiness unavailable, Sessions unavailable, No session data recorded, Not available, N/A, unknown
+- **Dashboard resilience test hooks**: `__dashboardTestHooks` export for internal testing (not public API)
+- 10 new V2.2 tests (3 E2E: empty state, empty sessions, no unsafe values; 7 helper tests via `__dashboardTestHooks`)
+
+### Verified
+- All 66 prior tests continue to pass
+- Main UI area contains no `undefined`, `null`, or `[object Object]` strings
+- MVP workflow degradation preserved
+- V2.1 sidebar markers and merge explanations preserved
+
 ## V2.1 (2026-06-30)
 
 ### Added — Dashboard Usability Enhancement
