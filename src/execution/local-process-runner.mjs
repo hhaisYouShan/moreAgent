@@ -32,7 +32,16 @@ export function createLocalProcessRunner({ runnerId = 'local-process', maxOutput
         let timeoutHandle = null;
         let forceKillHandle = null;
 
-        active.set(executionId, Object.freeze({ child, startedAt }));
+        active.set(executionId, {
+          child,
+          startedAt,
+          cancel() {
+            if (settled) return false;
+            terminationReason = 'CANCELLED';
+            terminate('SIGTERM');
+            return true;
+          },
+        });
 
         const append = (stream, chunk) => {
           const text = chunk.toString();
@@ -64,13 +73,16 @@ export function createLocalProcessRunner({ runnerId = 'local-process', maxOutput
                 : exitCode === 0
                   ? 'SUCCEEDED'
                   : 'FAILED';
-          finish({ status, exitCode, signal: closeSignal, error: terminationReason === 'OUTPUT_LIMIT' ? 'output_limit_exceeded' : null });
+          finish({
+            status,
+            exitCode,
+            signal: closeSignal,
+            error: terminationReason === 'OUTPUT_LIMIT' ? 'output_limit_exceeded' : null,
+          });
         });
 
         const abort = () => {
-          if (settled) return;
-          terminationReason = 'CANCELLED';
-          terminate('SIGTERM');
+          active.get(executionId)?.cancel();
         };
         signal?.addEventListener('abort', abort, { once: true });
 
@@ -119,10 +131,7 @@ export function createLocalProcessRunner({ runnerId = 'local-process', maxOutput
     },
 
     cancel(executionId) {
-      const entry = active.get(executionId);
-      if (!entry) return false;
-      entry.child.kill('SIGTERM');
-      return true;
+      return active.get(executionId)?.cancel() || false;
     },
 
     activeExecutions() {
