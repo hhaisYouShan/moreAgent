@@ -1,0 +1,62 @@
+name: record-bossresume-stage7
+
+on:
+  workflow_run:
+    workflows: [bossresume-stage7-validation]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  record:
+    if: >-
+      github.event.workflow_run.head_branch == 'ci/bossresume-stage7' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    concurrency:
+      group: record-bossresume-stage7
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+      - name: Download Stage 7 validation evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          mkdir -p /tmp/bossresume-stage7
+          gh run download "$RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name bossresume-stage7-validation \
+            --dir /tmp/bossresume-stage7 || true
+      - name: Record validation result and apply Stage Gate
+        env:
+          STAGE7_ARTIFACT_DIR: /tmp/bossresume-stage7
+          VALIDATION_WORKFLOW: bossresume-stage7-validation
+          VALIDATION_RUN_ID: ${{ github.event.workflow_run.id }}
+          VALIDATION_RUN_URL: ${{ github.event.workflow_run.html_url }}
+          VALIDATION_RESULT: ${{ github.event.workflow_run.conclusion }}
+          VALIDATION_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          VALIDATION_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: node scripts/record-stage7-validation-gate.mjs
+      - name: Verify program state
+        run: node scripts/verify-doc-fact-sources.mjs
+      - name: Commit Stage 7 evidence
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/program-status.json docs/roadmap.md docs/stage7-validation-report.json validation/bossresume/results
+          if git diff --cached --quiet; then
+            echo "No Stage 7 evidence changes to commit."
+            exit 0
+          fi
+          git commit -m "docs: record BossResume Stage 7 validation"
+          git pull --rebase origin main
+          git push origin HEAD:main
