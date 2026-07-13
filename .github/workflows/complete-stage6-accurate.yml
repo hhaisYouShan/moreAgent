@@ -1,0 +1,63 @@
+name: complete-stage6-accurate
+
+on:
+  workflow_run:
+    workflows: [verify]
+    types: [completed]
+
+permissions:
+  contents: write
+
+jobs:
+  advance:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'ci/verify-stage6-gate-accurate' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    concurrency:
+      group: complete-stage6-accurate
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+      - name: Complete Stage 6 from verified evidence
+        env:
+          VALIDATION_WORKFLOW: verify
+          VALIDATION_RUN_ID: ${{ github.event.workflow_run.id }}
+          VALIDATION_RUN_URL: ${{ github.event.workflow_run.html_url }}
+          VALIDATION_RESULT: ${{ github.event.workflow_run.conclusion }}
+          VALIDATION_HEAD_BRANCH: ci/verify-stage6-gate
+          VALIDATION_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: node scripts/complete-stage6.mjs
+      - name: Correct and verify actual validation branch evidence
+        env:
+          ACTUAL_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile, writeFile } from 'node:fs/promises';
+          const statusPath = 'docs/program-status.json';
+          const reportPath = 'docs/stage6-validation-report.json';
+          const status = JSON.parse(await readFile(statusPath, 'utf8'));
+          const report = JSON.parse(await readFile(reportPath, 'utf8'));
+          status.latestValidation.headBranch = process.env.ACTUAL_HEAD_BRANCH;
+          report.validation.headBranch = process.env.ACTUAL_HEAD_BRANCH;
+          if (status.latestValidation.headBranch !== 'ci/verify-stage6-gate-accurate') throw new Error('Incorrect validation branch evidence.');
+          if (report.validation.headBranch !== status.latestValidation.headBranch) throw new Error('Validation evidence mismatch.');
+          await writeFile(statusPath, `${JSON.stringify(status, null, 2)}\n`);
+          await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+          NODE
+      - name: Re-verify documentation state
+        run: node scripts/verify-doc-fact-sources.mjs
+      - name: Commit verified stage transition
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/program-status.json docs/roadmap.md docs/system-testing.md docs/stage6-validation-report.json validation/bossresume/stage7-entry-checklist.md
+          git commit -m "docs: complete stage 6 system verification"
+          git push origin HEAD:main
