@@ -50,8 +50,11 @@ if (!/current_stage:\s*1\b/.test(roadmap)) errors.push('docs/roadmap.md: current
 if (!/(Stage 7[^\n]*BossResume|BossResume[^\n]*Stage 7)/i.test(roadmap)) errors.push('docs/roadmap.md: BossResume validation must be bound to Stage 7');
 
 const bossResumeBoundary = await safeRead('projects/bossresume/README.md');
-if (!/not[^\n]*(current|canonical)/i.test(bossResumeBoundary)) {
-  errors.push('projects/bossresume/README.md: must explicitly reject current-goal or canonical-source authority');
+if (!/not[\s\S]*current AI Software Company OS delivery goal/i.test(bossResumeBoundary)) {
+  errors.push('projects/bossresume/README.md: must reject current OS delivery-goal authority');
+}
+if (!/not[\s\S]*canonical OS product or architecture source/i.test(bossResumeBoundary)) {
+  errors.push('projects/bossresume/README.md: must reject canonical product/architecture authority');
 }
 
 const validationBoundary = await safeRead('validation/README.md');
