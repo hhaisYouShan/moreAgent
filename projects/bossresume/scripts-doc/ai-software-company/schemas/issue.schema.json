@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-software-company.local/schemas/issue.schema.json",
+  "title": "Issue Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "issueId", "projectId", "workflowId", "type", "severity", "decisionType", "status", "summary", "evidenceArtifactIds", "requiredRetest", "repeatCount", "createdAt"],
+  "properties": {
+    "schemaVersion": {"const": "1.0"},
+    "issueId": {"type": "string", "minLength": 1},
+    "projectId": {"type": "string", "minLength": 1},
+    "workflowId": {"type": "string", "minLength": 1},
+    "sourceGateId": {"type": ["string", "null"]},
+    "requirementIds": {"type": "array", "items": {"type": "string"}, "uniqueItems": true, "default": []},
+    "type": {"enum": ["SYSTEM", "ENVIRONMENT", "OUTPUT_CONTRACT", "BUSINESS", "DESIGN", "IMPLEMENTATION", "INTEGRATION", "TEST", "SECURITY", "PERFORMANCE", "EXPERIENCE"]},
+    "severity": {"enum": ["BLOCKING", "MAJOR", "MINOR", "INFO"]},
+    "decisionType": {"enum": ["AUTO_FIXABLE", "HUMAN_DECISION_REQUIRED", "SYSTEM_RECOVERY_REQUIRED", "SECURITY_APPROVAL_REQUIRED", "DEFERRED"]},
+    "status": {"enum": ["OPEN", "TRIAGED", "ASSIGNED", "FIXING", "READY_FOR_RECHECK", "VERIFIED", "CLOSED", "REOPENED", "DUPLICATE", "REJECTED", "DEFERRED"]},
+    "primaryOwner": {"type": ["string", "null"]},
+    "candidateOwners": {"type": "array", "items": {"type": "string"}, "uniqueItems": true, "default": []},
+    "attributionConfidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "automaticDispatchAllowed": {"type": "boolean", "default": false},
+    "summary": {"type": "string", "minLength": 1},
+    "reproduction": {"type": "array", "items": {"type": "string"}, "default": []},
+    "expected": {"type": ["string", "null"]},
+    "actual": {"type": ["string", "null"]},
+    "evidenceArtifactIds": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "requiredRetest": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "repeatCount": {"type": "integer", "minimum": 1},
+    "introducedByCurrentChange": {"type": ["boolean", "null"]},
+    "createdAt": {"type": "string", "format": "date-time"}
+  }
+}

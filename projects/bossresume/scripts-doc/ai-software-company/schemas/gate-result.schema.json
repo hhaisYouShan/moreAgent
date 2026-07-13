@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-software-company.local/schemas/gate-result.schema.json",
+  "title": "Gate Result Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "gateId", "gateType", "projectId", "workflowId", "phase", "status", "inputArtifactIds", "deterministicChecks", "issueIds", "blockingIssueCount", "majorIssueCount", "nextState", "computedBy", "createdAt"],
+  "properties": {
+    "schemaVersion": {"const": "1.0"},
+    "gateId": {"type": "string", "minLength": 1},
+    "gateType": {
+      "enum": [
+        "PRD_GATE",
+        "ARCHITECTURE_GATE",
+        "UI_GATE",
+        "DESIGN_GATE",
+        "TEST_GATE",
+        "PRODUCT_ACCEPTANCE_GATE",
+        "USER_ACCEPTANCE_GATE",
+        "ARCHIVE_GATE"
+      ]
+    },
+    "projectId": {"type": "string", "minLength": 1},
+    "workflowId": {"type": "string", "minLength": 1},
+    "phase": {"type": "string", "minLength": 1},
+    "status": {"enum": ["APPROVED", "CHANGES_REQUESTED", "BLOCKED", "REJECTED", "INCONSISTENT"]},
+    "inputArtifactIds": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "deterministicChecks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["check", "status"],
+        "properties": {
+          "check": {"type": "string", "minLength": 1},
+          "status": {"enum": ["PASS", "FAIL", "SKIPPED", "ERROR"]},
+          "evidenceArtifactId": {"type": ["string", "null"]},
+          "message": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "reviewRecommendations": {"type": "array", "items": {"type": "string"}, "default": []},
+    "issueIds": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "blockingIssueCount": {"type": "integer", "minimum": 0},
+    "majorIssueCount": {"type": "integer", "minimum": 0},
+    "nextState": {"type": "string", "minLength": 1},
+    "computedBy": {"type": "string", "minLength": 1},
+    "createdAt": {"type": "string", "format": "date-time"}
+  }
+}

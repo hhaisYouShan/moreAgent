@@ -1,0 +1,11 @@
+{
+  "status": "superseded",
+  "source_date": "2026-07-12",
+  "files": {
+    "01-business-and-product.md": "4eea40b42c0b253edee6ba5a194c4dbc285f746a",
+    "02-architecture-and-system-design.md": "85f342aaa3665376647068b804d6a33d2218d709",
+    "03-agent-core-mechanisms.md": "e43dd21f79f7a4c25874beee1b2a66bcdc3b0d15"
+  },
+  "execution_authority": false,
+  "note": "These are immutable historical snapshots. Current execution uses the root six-module documents and formal process facts."
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-software-company.local/schemas/event.schema.json",
+  "title": "Event Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "eventId", "eventType", "eventVersion", "traceId", "tenantId", "userId", "projectId", "workflowId", "actor", "occurredAt", "idempotencyKey", "payload"],
+  "properties": {
+    "schemaVersion": {"const": "1.0"},
+    "eventId": {"type": "string", "minLength": 1},
+    "eventType": {"type": "string", "minLength": 1},
+    "eventVersion": {"type": "string", "minLength": 1},
+    "traceId": {"type": "string", "minLength": 1},
+    "tenantId": {"type": "string", "minLength": 1},
+    "userId": {"type": "string", "minLength": 1},
+    "projectId": {"type": "string", "minLength": 1},
+    "workflowId": {"type": "string", "minLength": 1},
+    "phaseId": {"type": ["string", "null"]},
+    "workstreamId": {"type": ["string", "null"]},
+    "taskId": {"type": ["string", "null"]},
+    "runId": {"type": ["string", "null"]},
+    "sessionId": {"type": ["string", "null"]},
+    "actor": {"type": "string", "minLength": 1},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "idempotencyKey": {"type": "string", "minLength": 1},
+    "payload": {"type": "object"}
+  }
+}

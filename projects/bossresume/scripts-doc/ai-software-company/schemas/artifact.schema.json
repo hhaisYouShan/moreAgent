@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-software-company.local/schemas/artifact.schema.json",
+  "title": "Artifact Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "artifactId", "projectId", "workflowId", "type", "version", "status", "path", "contentHash", "producedByTaskId", "producedByRunId", "retentionClass", "createdAt"],
+  "properties": {
+    "schemaVersion": {"const": "1.0"},
+    "artifactId": {"type": "string", "minLength": 1},
+    "projectId": {"type": "string", "minLength": 1},
+    "workflowId": {"type": "string", "minLength": 1},
+    "type": {"type": "string", "minLength": 1},
+    "logicalKey": {"type": ["string", "null"]},
+    "version": {"type": "integer", "minimum": 1},
+    "status": {"enum": ["DRAFT", "ACTIVE", "SUPERSEDED", "REJECTED", "ARCHIVED", "EXPIRED"]},
+    "path": {"type": "string", "minLength": 1},
+    "contentHash": {"type": "string", "pattern": "^sha256:[a-fA-F0-9]{64}$"},
+    "producedByTaskId": {"type": "string", "minLength": 1},
+    "producedByRunId": {"type": "string", "minLength": 1},
+    "supersedes": {"type": ["string", "null"]},
+    "approvedByGateId": {"type": ["string", "null"]},
+    "sourceArtifactIds": {"type": "array", "items": {"type": "string"}, "uniqueItems": true, "default": []},
+    "retentionClass": {"enum": ["EPHEMERAL", "RUN_LIFETIME", "WORKFLOW_LIFETIME", "PROJECT_LIFETIME", "PERMANENT_AUDIT"]},
+    "createdAt": {"type": "string", "format": "date-time"}
+  }
+}

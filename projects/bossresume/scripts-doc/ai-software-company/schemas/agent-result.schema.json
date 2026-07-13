@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-software-company.local/schemas/agent-result.schema.json",
+  "title": "Agent Result Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "taskId", "runId", "agent", "agentContractVersion", "conclusion", "changedFiles", "artifactIds", "issues", "knownRisks", "evidence", "allowsNextGate", "startedAt", "finishedAt"],
+  "properties": {
+    "schemaVersion": {"const": "1.0"},
+    "taskId": {"type": "string", "minLength": 1},
+    "runId": {"type": "string", "minLength": 1},
+    "sessionId": {"type": ["string", "null"]},
+    "agent": {"type": "string", "minLength": 1},
+    "agentContractVersion": {"type": "string", "minLength": 1},
+    "modelProvider": {"type": ["string", "null"]},
+    "modelVersion": {"type": ["string", "null"]},
+    "conclusion": {"enum": ["APPROVED", "CHANGES_REQUESTED", "BLOCKED", "DONE", "FAILED"]},
+    "changedFiles": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "implementedRequirementIds": {"type": "array", "items": {"type": "string"}, "uniqueItems": true, "default": []},
+    "artifactIds": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "testsRun": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["command", "exitCode"],
+        "properties": {
+          "command": {"type": "string", "minLength": 1},
+          "exitCode": {"type": "integer"},
+          "evidenceArtifactId": {"type": ["string", "null"]}
+        }
+      },
+      "default": []
+    },
+    "issues": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "knownRisks": {"type": "array", "items": {"type": "string"}},
+    "evidence": {"type": "array", "items": {"type": "string"}},
+    "allowsNextGate": {"type": "boolean"},
+    "startedAt": {"type": "string", "format": "date-time"},
+    "finishedAt": {"type": "string", "format": "date-time"}
+  }
+}
