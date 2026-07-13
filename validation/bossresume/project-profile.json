@@ -1,0 +1,89 @@
+{
+  "schemaVersion": "1.0",
+  "profileType": "PROJECT_VALIDATION_PROFILE",
+  "profileId": "bossresume-stage7",
+  "projectId": "bossresume",
+  "repository": {
+    "provider": "GITHUB",
+    "fullName": "hhaisYouShan/bossResume",
+    "ref": "master",
+    "baselinePolicy": "RESOLVE_AND_RECORD_BEFORE_EXECUTION"
+  },
+  "projectType": "EXISTING_REFACTOR",
+  "businessCodeMode": "READ_ONLY_UNTIL_VALIDATION_TASK_APPROVED",
+  "prdPath": "docs/prd/bossresume-full-refactor-prd.md",
+  "requiredPaths": [
+    { "path": "package.json", "type": "file", "required": true },
+    { "path": "client", "type": "directory", "required": true },
+    { "path": "server", "type": "directory", "required": true },
+    { "path": "client/package.json", "type": "file", "required": true },
+    { "path": "server/package.json", "type": "file", "required": true },
+    { "path": "docs/prd/bossresume-full-refactor-prd.md", "type": "file", "required": true }
+  ],
+  "moduleRoots": ["client", "server", "docs/prd"],
+  "manifests": [
+    { "path": "package.json", "required": true },
+    { "path": "client/package.json", "required": true },
+    { "path": "server/package.json", "required": true }
+  ],
+  "excludes": [".env", ".env.local", "uploads", "data", "logs"],
+  "maxFiles": 30000,
+  "verificationCommands": [
+    {
+      "verificationId": "git-baseline-clean",
+      "command": "git",
+      "args": ["status", "--porcelain"],
+      "cwd": ".",
+      "required": true,
+      "timeoutMs": 30000
+    },
+    {
+      "verificationId": "root-test",
+      "manifestPath": "package.json",
+      "whenScript": "test",
+      "command": "npm",
+      "args": ["test"],
+      "cwd": ".",
+      "required": false,
+      "timeoutMs": 900000
+    },
+    {
+      "verificationId": "client-build",
+      "manifestPath": "client/package.json",
+      "whenScript": "build",
+      "command": "npm",
+      "args": ["run", "build"],
+      "cwd": "client",
+      "required": false,
+      "timeoutMs": 900000
+    },
+    {
+      "verificationId": "server-test",
+      "manifestPath": "server/package.json",
+      "whenScript": "test",
+      "command": "npm",
+      "args": ["test"],
+      "cwd": "server",
+      "required": false,
+      "timeoutMs": 900000
+    },
+    {
+      "verificationId": "server-build",
+      "manifestPath": "server/package.json",
+      "whenScript": "build",
+      "command": "npm",
+      "args": ["run", "build"],
+      "cwd": "server",
+      "required": false,
+      "timeoutMs": 900000
+    }
+  ],
+  "forbiddenActions": [
+    "PUSH_TO_BOSSRESUME",
+    "MODIFY_MASTER",
+    "WRITE_BUSINESS_CODE_BEFORE_APPROVED_TASK",
+    "USE_REAL_PRODUCTION_DATA",
+    "RUN_PRODUCTION_MIGRATION",
+    "ASSUME_PRODUCT_OR_USER_ACCEPTANCE"
+  ]
+}
