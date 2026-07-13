@@ -13,7 +13,7 @@
     "gateResult": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schemaVersion", "entityType", "gateId", "gateType", "workflowId", "phase", "conclusion", "inputArtifactIds", "issueIds", "openBlockingCount", "openMajorCount", "decidedAt", "engineVersion"],
+      "required": ["schemaVersion", "entityType", "gateId", "gateType", "workflowId", "phase", "conclusion", "inputArtifactIds", "issueIds", "openBlockingCount", "openMajorCount", "allowsNextStage", "deterministicChecks", "reviewerRecommendations", "decidedAt", "engineVersion"],
       "properties": {
         "schemaVersion": { "const": "1.0" },
         "entityType": { "const": "GATE_RESULT" },
@@ -28,6 +28,34 @@
         "openMajorCount": { "type": "integer", "minimum": 0 },
         "allowsNextStage": { "type": "boolean" },
         "failureReason": { "type": ["string", "null"] },
+        "deterministicChecks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": ["status"],
+            "properties": {
+              "checkId": { "type": "string" },
+              "status": { "enum": ["PASS", "FAIL", "BLOCKED", "NOT_RUN", "SKIPPED_NOT_REQUIRED"] },
+              "reason": { "type": ["string", "null"] },
+              "evidenceIds": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" }
+            }
+          }
+        },
+        "reviewerRecommendations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["reviewer", "conclusion"],
+            "properties": {
+              "reviewer": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+              "conclusion": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/gateConclusion" },
+              "note": { "type": ["string", "null"] }
+            }
+          }
+        },
+        "userConfirmationId": { "anyOf": [{ "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" }, { "type": "null" }] },
         "decidedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
         "engineVersion": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" }
       }
