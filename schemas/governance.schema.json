@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moreagent.dev/schemas/governance.schema.json",
+  "title": "Governance entities",
+  "oneOf": [
+    { "$ref": "#/$defs/gateResult" },
+    { "$ref": "#/$defs/issue" },
+    { "$ref": "#/$defs/checkpoint" },
+    { "$ref": "#/$defs/userDecision" },
+    { "$ref": "#/$defs/acceptance" }
+  ],
+  "$defs": {
+    "gateResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "entityType", "gateId", "gateType", "workflowId", "phase", "conclusion", "inputArtifactIds", "issueIds", "openBlockingCount", "openMajorCount", "decidedAt", "engineVersion"],
+      "properties": {
+        "schemaVersion": { "const": "1.0" },
+        "entityType": { "const": "GATE_RESULT" },
+        "gateId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "gateType": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "workflowId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "phase": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/workflowPhase" },
+        "conclusion": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/gateConclusion" },
+        "inputArtifactIds": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
+        "issueIds": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
+        "openBlockingCount": { "type": "integer", "minimum": 0 },
+        "openMajorCount": { "type": "integer", "minimum": 0 },
+        "allowsNextStage": { "type": "boolean" },
+        "failureReason": { "type": ["string", "null"] },
+        "decidedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
+        "engineVersion": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" }
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "entityType", "issueId", "signature", "workflowId", "severity", "status", "decisionType", "failureReason", "primaryOwner", "evidenceIds", "expectedFix", "requiredRecheck", "createdAt", "updatedAt"],
+      "properties": {
+        "schemaVersion": { "const": "1.0" },
+        "entityType": { "const": "ISSUE" },
+        "issueId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "signature": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/sha256" },
+        "workflowId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "severity": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/issueSeverity" },
+        "status": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/issueStatus" },
+        "decisionType": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/decisionType" },
+        "failureReason": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "primaryOwner": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "candidateOwners": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
+        "evidenceIds": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
+        "expectedFix": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "requiredRecheck": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/stringArray" },
+        "repeatCount": { "type": "integer", "minimum": 1, "default": 1 },
+        "createdAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
+        "updatedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" }
+      }
+    },
+    "checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "entityType", "checkpointId", "workflowId", "status", "baseCommit", "evidenceIds", "checkedAt"],
+      "properties": {
+        "schemaVersion": { "const": "1.0" },
+        "entityType": { "const": "CHECKPOINT" },
+        "checkpointId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "workflowId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "status": { "enum": ["DRAFT", "IN_PROGRESS", "CHANGES_REQUESTED", "NEEDS_USER", "BLOCKED_BY_SYSTEM", "APPROVED"] },
+        "baseCommit": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "evidenceIds": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
+        "checkedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
+        "approvedBy": { "type": ["string", "null"] },
+        "approvedAt": { "type": ["string", "null"], "format": "date-time" }
+      }
+    },
+    "userDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "entityType", "decisionId", "workflowId", "topic", "decision", "decidedBy", "decidedAt", "baselineHash"],
+      "properties": {
+        "schemaVersion": { "const": "1.0" },
+        "entityType": { "const": "USER_DECISION" },
+        "decisionId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "workflowId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "topic": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "decision": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "decidedBy": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "decidedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
+        "baselineHash": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/sha256" }
+      }
+    },
+    "acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "entityType", "acceptanceId", "workflowId", "acceptanceType", "status", "requirementIds", "evidenceIds", "decidedBy", "decidedAt", "baselineHash"],
+      "properties": {
+        "schemaVersion": { "const": "1.0" },
+        "entityType": { "const": "ACCEPTANCE" },
+        "acceptanceId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "workflowId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "acceptanceType": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/acceptanceType" },
+        "status": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/acceptanceStatus" },
+        "requirementIds": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
+        "evidenceIds": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
+        "decidedBy": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "decidedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
+        "baselineHash": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/sha256" },
+        "feedback": { "type": ["string", "null"] }
+      }
+    }
+  }
+}
