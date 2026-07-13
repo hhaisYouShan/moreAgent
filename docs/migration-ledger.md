@@ -11,7 +11,7 @@ REFERENCE -> EXTRACTING -> DUAL_RUN_PASS -> SWITCHED -> DELETABLE -> REMOVED
 | Capability | BossResume reference modules | MoreAgent destination | Status | Switch condition |
 | --- | --- | --- | --- | --- |
 | State-source inspection | `state.mjs`, `reconcile-state-sources.mjs` | `src/core/state-sources.mjs` | `DUAL_RUN_PASS` | Keep read-only until generic apply passes |
-| Reconcile apply and evidence | `reconcile-state-sources.mjs`, `run-status.mjs` | `src/core/reconcile.mjs` | `REFERENCE` | Preserve pointers, worktrees and M0 boundary |
+| Reconcile apply and evidence | `reconcile-state-sources.mjs`, `run-status.mjs` | `src/core/reconcile.mjs` | `EXTRACTING` | Preserve pointers, worktrees and M0 boundary |
 | Workflow state presentation | `state.mjs`, `state-cli.mjs`, `status.mjs` | `src/core/state.mjs`, adapter renderer | `REFERENCE` | JSON, Markdown and Round Context parity |
 | Gate and Issue contracts | `gate.mjs`, `gate-result-validator.mjs`, `issue-router.mjs` | `src/contracts/` | `REFERENCE` | Registered gates and structured Issue parity |
 | Run, task and event lifecycle | `run-status.mjs`, `persistence.mjs` | `src/runtime/` | `REFERENCE` | Resume and stale-pointer cases pass |

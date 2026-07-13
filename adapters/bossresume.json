@@ -58,6 +58,38 @@
     "runReferenceFields": ["decisionPath", "issuesPath", "completionStatusPath", "runDir"],
     "taskReferenceFields": ["log", "statusFile", "script", "gateResult", "outputs"]
   },
+  "reconcile": {
+    "archiveRoot": ".agent-runs/reconciled",
+    "idleRun": {
+      "phase": "IDLE",
+      "gate": "NONE",
+      "gateStatus": "DRAFT",
+      "status": "IDLE",
+      "step": "IDLE"
+    },
+    "blockedWorkflow": {
+      "status": "BLOCKED_BY_SYSTEM",
+      "step": "VERIFY",
+      "phase": "INTAKE",
+      "round": 0,
+      "gate": "NONE",
+      "gateStatus": "DRAFT",
+      "activeAgent": "gate_verifier",
+      "ownerAgent": "gate_verifier",
+      "failureReason": "state_source_split"
+    },
+    "readyWorkflow": {
+      "status": "READY",
+      "step": "PLAN",
+      "phase": "INTAKE",
+      "round": 0,
+      "gate": "NONE",
+      "gateStatus": "DRAFT",
+      "activeAgent": "gate_verifier",
+      "ownerAgent": "gate_verifier",
+      "failureReason": null
+    }
+  },
   "m0": {
     "checkpointPath": "agent-loop-docs/checkpoints/bossresume-full-refactor-m0-baseline-checkpoint.json",
     "message": "State reconciliation is complete. M0 remains independently required; Product Agent and business code stay blocked until effectiveApproval=true."

@@ -8,7 +8,7 @@
     "moreagent": "./src/cli.mjs"
   },
   "scripts": {
-    "check": "node --check src/cli.mjs && node --check src/core/state-sources.mjs",
+    "check": "node --check src/cli.mjs && node --check src/core/state-sources.mjs && node --check src/core/reconcile.mjs",
     "test": "node --test test/*.test.mjs",
     "verify": "npm run check && npm run test"
   },
