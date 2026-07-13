@@ -8,7 +8,7 @@
     "moreagent": "./src/cli.mjs"
   },
   "scripts": {
-    "check": "node --check src/cli.mjs && node --check src/core/state-sources.mjs && node --check src/core/reconcile.mjs && node --check src/contracts/gates.mjs && node --check src/contracts/self-check.mjs && node --check src/contracts/issues.mjs && node --check src/runtime/lifecycle.mjs && node --check src/runtime/worktrees.mjs",
+    "check": "node --check src/cli.mjs && node --check src/core/state-sources.mjs && node --check src/core/reconcile.mjs && node --check src/contracts/gates.mjs && node --check src/contracts/self-check.mjs && node --check src/contracts/issues.mjs && node --check src/contracts/checkpoint.mjs && node --check src/runtime/lifecycle.mjs && node --check src/runtime/worktrees.mjs && node --check src/runtime/planner.mjs",
     "test": "node --test test/*.test.mjs",
     "verify": "npm run check && npm run test"
   },

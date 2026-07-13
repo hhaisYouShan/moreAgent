@@ -94,6 +94,33 @@
     "checkpointPath": "agent-loop-docs/checkpoints/bossresume-full-refactor-m0-baseline-checkpoint.json",
     "message": "State reconciliation is complete. M0 remains independently required; Product Agent and business code stay blocked until effectiveApproval=true."
   },
+  "checkpoint": {
+    "requiredPhases": ["INTAKE", "PRODUCT_REVIEW"],
+    "resultPath": "agent-loop-docs/checkpoints/bossresume-full-refactor-m0-baseline-checkpoint.json",
+    "statusField": "status",
+    "approvedValue": "APPROVED",
+    "requiredFields": ["schema_version", "checkpoint_type", "approved_by", "approved_at"]
+  },
+  "planner": {
+    "phases": {
+      "INTAKE": [{ "id": "product-review", "agent": "product_agent", "taskKind": "PRODUCT_INITIAL_REVIEW", "dependsOn": [] }],
+      "PRD_REVIEW": [
+        { "id": "frontend-prd-review", "agent": "frontend_agent", "taskKind": "PRD_DOMAIN_REVIEW", "dependsOn": [] },
+        { "id": "backend-prd-review", "agent": "backend_agent", "taskKind": "PRD_DOMAIN_REVIEW", "dependsOn": [] },
+        { "id": "test-prd-review", "agent": "test_agent", "taskKind": "PRD_DOMAIN_REVIEW", "dependsOn": [] },
+        { "id": "ui-prd-review", "agent": "ui_agent", "taskKind": "UI_REVIEW", "dependsOn": [] }
+      ],
+      "ARCHITECTURE_IMPACT_REVIEW": [{ "id": "frontend-architecture-impact-review", "agent": "frontend_architect_agent", "taskKind": "TECH_PLAN", "dependsOn": [] }, { "id": "backend-architecture-impact-review", "agent": "backend_architect_agent", "taskKind": "TECH_PLAN", "dependsOn": [] }, { "id": "architecture-impact-testability-review", "agent": "test_agent", "taskKind": "PRD_DOMAIN_REVIEW", "dependsOn": [] }],
+      "UI_DESIGN": [{ "id": "ui-design", "agent": "ui_agent", "taskKind": "UI_DESIGN", "dependsOn": [] }],
+      "DEVELOPMENT_DESIGN": [{ "id": "frontend-dev-design", "agent": "frontend_agent", "taskKind": "TECH_PLAN", "dependsOn": [] }, { "id": "backend-dev-design", "agent": "backend_agent", "taskKind": "TECH_PLAN", "dependsOn": [] }, { "id": "test-design", "agent": "test_agent", "taskKind": "TECH_PLAN", "dependsOn": [] }],
+      "DESIGN_REVIEW": [{ "id": "atomic-task-review", "agent": "review_agent", "taskKind": "PRD_DOMAIN_REVIEW", "dependsOn": [] }],
+      "IMPLEMENTATION": [{ "id": "frontend-atomic-implementation", "agent": "frontend_agent", "taskKind": "IMPLEMENTATION", "dependsOn": [] }, { "id": "backend-atomic-implementation", "agent": "backend_agent", "taskKind": "IMPLEMENTATION", "dependsOn": [] }],
+      "TESTING": [{ "id": "test-execution", "agent": "test_agent", "taskKind": "TEST_EXECUTION", "dependsOn": [] }],
+      "PRODUCT_ACCEPTANCE": [{ "id": "product-acceptance", "agent": "product_agent", "taskKind": "PRODUCT_ACCEPTANCE", "dependsOn": [] }],
+      "USER_ACCEPTANCE": [{ "id": "user-acceptance", "agent": "brain_agent", "taskKind": "USER_ACCEPTANCE", "dependsOn": [] }],
+      "ARCHIVE": [{ "id": "archive", "agent": "brain_agent", "taskKind": "ARCHIVE", "dependsOn": [] }]
+    }
+  },
   "delivery": {
     "registeredGates": ["PRD_GATE", "ARCHITECTURE_GATE", "UI_GATE", "DESIGN_GATE", "TEST_GATE", "PRODUCT_ACCEPTANCE_GATE", "USER_ACCEPTANCE_GATE", "ARCHIVE_GATE"],
     "brainMayWriteBusinessCode": false,
