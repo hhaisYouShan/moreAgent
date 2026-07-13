@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moreagent.dev/schemas/task.schema.json",
+  "title": "Atomic Task",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "entityType", "taskId", "workflowId", "workstreamId", "ownerAgent",
+    "goal", "requirementIds", "inputHash", "dependsOn", "conflictsWith", "resourceLocks",
+    "editablePaths", "forbiddenPaths", "acceptanceCommands", "requiredTests", "status", "maxAttempts"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "entityType": { "const": "TASK" },
+    "taskId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+    "workflowId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+    "workstreamId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+    "ownerAgent": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+    "goal": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+    "requirementIds": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
+    "inputHash": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/sha256" },
+    "dependsOn": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
+    "softDependsOn": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
+    "conflictsWith": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
+    "resourceLocks": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/stringArray" },
+    "consumes": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
+    "produces": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
+    "editablePaths": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/stringArray" },
+    "forbiddenPaths": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/stringArray" },
+    "acceptanceCommands": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/stringArray" },
+    "requiredTests": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/stringArray" },
+    "contextManifestId": { "anyOf": [{ "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" }, { "type": "null" }] },
+    "status": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/taskStatus" },
+    "attempt": { "type": "integer", "minimum": 0, "default": 0 },
+    "maxAttempts": { "type": "integer", "minimum": 1, "maximum": 20 },
+    "timeoutSeconds": { "type": "integer", "minimum": 1 },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxTokens": { "type": "integer", "minimum": 0 },
+        "maxCost": { "type": "number", "minimum": 0 },
+        "currency": { "type": "string", "minLength": 3, "maxLength": 3 }
+      }
+    }
+  }
+}
