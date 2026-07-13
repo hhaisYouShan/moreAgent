@@ -2,7 +2,7 @@
   "name": "moreagent",
   "version": "0.2.0",
   "private": true,
-  "description": "Project-agnostic multi-agent delivery control plane",
+  "description": "Project-agnostic AI Software Company OS",
   "type": "module",
   "bin": {
     "moreagent": "./src/cli.mjs"
@@ -19,10 +19,15 @@
     "agent:checkpoint": "node scripts/agent-loop/checkpoint.mjs",
     "agent:reconcile": "node scripts/agent-loop/reconcile-state-sources.mjs",
     "agent:test:control-plane": "node --test scripts/agent-loop/tests/m0-guard.test.mjs scripts/agent-loop/tests/state-reconcile.test.mjs scripts/agent-loop/tests/gate-allowlist.test.mjs",
-    "check": "node --check src/cli.mjs && node --check src/core/state-sources.mjs && node --check src/core/reconcile.mjs && node --check src/contracts/gates.mjs && node --check src/contracts/self-check.mjs && node --check src/contracts/issues.mjs && node --check src/contracts/checkpoint.mjs && node --check src/runtime/lifecycle.mjs && node --check src/runtime/worktrees.mjs && node --check src/runtime/planner.mjs && node --check src/runtime/orchestrator.mjs && node --check scripts/verify-doc-fact-sources.mjs",
+    "check": "node --check src/cli.mjs && node --check src/domain/enums.mjs && node --check src/contracts/schema-registry.mjs && node --check src/core/state-sources.mjs && node --check src/core/reconcile.mjs && node --check src/contracts/gates.mjs && node --check src/contracts/self-check.mjs && node --check src/contracts/issues.mjs && node --check src/contracts/checkpoint.mjs && node --check src/runtime/lifecycle.mjs && node --check src/runtime/worktrees.mjs && node --check src/runtime/planner.mjs && node --check src/runtime/orchestrator.mjs && node --check adapters/bossresume-contracts.mjs && node --check scripts/verify-doc-fact-sources.mjs",
     "test": "node --test test/*.test.mjs",
     "verify": "npm run check && npm run verify:docs && npm run test",
-    "verify:docs": "node scripts/verify-doc-fact-sources.mjs"
+    "verify:docs": "node scripts/verify-doc-fact-sources.mjs",
+    "verify:contracts": "node --test test/contracts.test.mjs test/schema-contracts.test.mjs"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
   },
   "engines": {
     "node": ">=20"
