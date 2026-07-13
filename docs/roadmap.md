@@ -2,9 +2,9 @@
 
 ```yaml
 status: active
-version: 1.1
-updated_at: 2026-07-13
-current_stage: 2
+version: 1.2
+updated_at: 2026-07-14
+current_stage: 6
 machine_status: docs/program-status.json
 ```
 
@@ -17,16 +17,18 @@ Build a project-agnostic AI Software Company OS. BossResume is the first real-pr
 | Stage | Status |
 |---|---|
 | Stage 1 — Repository structure and documentation source-of-truth cleanup | `COMPLETED` |
-| Stage 2 — Stabilize Domain and Schema Contracts | `IN_PROGRESS` |
-| Stage 3 — Complete the Control Plane | `NOT_STARTED` |
-| Stage 4 — Complete the Execution Plane | `NOT_STARTED` |
-| Stage 5 — Evidence, Recovery, Integration, Release, Maintenance | `NOT_STARTED` |
-| Stage 6 — Complete system-level testing | `NOT_STARTED` |
+| Stage 2 — Stabilize Domain and Schema Contracts | `COMPLETED` |
+| Stage 3 — Complete the Control Plane | `COMPLETED` |
+| Stage 4 — Complete the Execution Plane | `COMPLETED` |
+| Stage 5 — Evidence, Recovery, Integration, Release, Maintenance | `COMPLETED` |
+| Stage 6 — Complete system-level testing | `IN_PROGRESS` |
 | Stage 7 — First real-project validation with BossResume | `NOT_STARTED` |
 | Stage 8 — Correct the OS based on validation findings | `NOT_STARTED` |
 | Stage 9 — Validate generality with a second project | `NOT_STARTED` |
 
 Machine-readable progress is stored only in `docs/program-status.json`.
+
+Stages 2–5 were verified through GitHub Actions run `29264466079` on Node 20 and Node 22. Syntax, documentation, contracts, Control Plane, Execution Plane, Evidence/Operations and the full regression suite all passed.
 
 ## Stage 1 — Repository structure and documentation source-of-truth cleanup
 
@@ -61,7 +63,7 @@ Completion evidence:
 
 ## Stage 2 — Stabilize Domain and Schema Contracts
 
-**Status:** `IN_PROGRESS`
+**Status:** `COMPLETED`
 
 **Goal:** define stable, project-agnostic runtime language before expanding execution.
 
@@ -79,7 +81,19 @@ Exit criteria:
 - Contracts contain no BossResume-specific fields or paths.
 - Compatibility mappings are explicit adapters, not core conditionals.
 
+Completion evidence:
+
+- `src/domain/enums.mjs`
+- `src/contracts/schema-registry.mjs`
+- `schemas/`
+- `test/contracts.test.mjs`
+- `test/schema-contracts.test.mjs`
+- `test/domain-contracts.test.mjs`
+- GitHub Actions run `29264466079`
+
 ## Stage 3 — Complete the Control Plane
+
+**Status:** `COMPLETED`
 
 **Goal:** make all delivery decisions deterministic and recoverable.
 
@@ -98,7 +112,15 @@ Exit criteria:
 - Failures route to one Primary Owner with required recheck.
 - State can be rebuilt from persisted facts and events.
 
+Completion evidence:
+
+- `src/control-plane/`
+- `test/control-plane.test.mjs`
+- GitHub Actions run `29264466079`
+
 ## Stage 4 — Complete the Execution Plane
+
+**Status:** `COMPLETED`
 
 **Goal:** execute approved work through replaceable tools without leaking tool semantics into Core.
 
@@ -118,7 +140,18 @@ Exit criteria:
 - Parallel tasks run only when DAG and resource rules permit.
 - An interrupted execution can resume or fail safely without duplicate side effects.
 
+Completion evidence:
+
+- `src/execution/`
+- `adapters/runners/`
+- `adapters/terminals/`
+- `adapters/workspaces/`
+- `test/execution-plane.test.mjs`
+- GitHub Actions run `29264466079`
+
 ## Stage 5 — Complete Evidence, Recovery, Integration, Release, and Maintenance
+
+**Status:** `COMPLETED`
 
 **Goal:** close the full delivery and post-release operating loop.
 
@@ -138,7 +171,18 @@ Exit criteria:
 - Release and rollback are repeatable and evidence-backed.
 - Post-release failures enter a controlled maintenance workflow.
 
+Completion evidence:
+
+- `src/evidence/`
+- `src/integration/`
+- `src/release/`
+- `src/maintenance/`
+- `test/evidence-operations.test.mjs`
+- GitHub Actions run `29264466079`
+
 ## Stage 6 — Complete system-level testing
+
+**Status:** `IN_PROGRESS`
 
 **Goal:** prove the OS itself is reliable before using a real business project.
 
@@ -159,7 +203,14 @@ Exit criteria:
 - Recovery tests preserve evidence and do not repeat irreversible side effects.
 - Stage 7 validation entry checklist is approved.
 
+Current implementation:
+
+- `src/system/os-runtime.mjs`
+- Stage 6 end-to-end and failure-injection tests are being added.
+
 ## Stage 7 — First real-project validation with BossResume
+
+**Status:** `NOT_STARTED`
 
 **Goal:** validate the completed OS against an existing, non-trivial refactor project.
 
@@ -178,6 +229,8 @@ Exit criteria:
 
 ## Stage 8 — Correct the OS based on validation findings
 
+**Status:** `NOT_STARTED`
+
 **Goal:** remove assumptions exposed by the first real-project validation.
 
 Scope:
@@ -194,6 +247,8 @@ Exit criteria:
 - The full synthetic suite and BossResume regression suite pass.
 
 ## Stage 9 — Validate generality with a second, different project
+
+**Status:** `NOT_STARTED`
 
 **Goal:** prove that the OS is not a single-project extraction.
 
