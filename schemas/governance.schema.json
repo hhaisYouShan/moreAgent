@@ -86,13 +86,14 @@
         "decision": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
         "decidedBy": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
         "decidedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
-        "baselineHash": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/sha256" }
+        "baselineHash": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/sha256" },
+        "baselineCommit": { "type": ["string", "null"] }
       }
     },
     "acceptance": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schemaVersion", "entityType", "acceptanceId", "workflowId", "acceptanceType", "status", "requirementIds", "evidenceIds", "decidedBy", "decidedAt", "baselineHash"],
+      "required": ["schemaVersion", "entityType", "acceptanceId", "workflowId", "acceptanceType", "status", "requirementIds", "evidenceIds", "decidedBy", "decidedAt", "baselineHash", "baselineCommit"],
       "properties": {
         "schemaVersion": { "const": "1.0" },
         "entityType": { "const": "ACCEPTANCE" },
@@ -105,6 +106,7 @@
         "decidedBy": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
         "decidedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
         "baselineHash": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/sha256" },
+        "baselineCommit": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
         "feedback": { "type": ["string", "null"] }
       }
     }
