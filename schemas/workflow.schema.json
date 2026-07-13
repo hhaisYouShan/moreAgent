@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moreagent.dev/schemas/workflow.schema.json",
+  "title": "Workflow",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "entityType", "workflowId", "projectId", "goal", "phase", "status", "round", "inputHash", "createdAt", "updatedAt"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "entityType": { "const": "WORKFLOW" },
+    "workflowId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+    "projectId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+    "goal": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+    "phase": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/workflowPhase" },
+    "status": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/workflowStatus" },
+    "round": { "type": "integer", "minimum": 0 },
+    "iteration": { "type": "integer", "minimum": 0, "default": 0 },
+    "inputHash": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/sha256" },
+    "requirementIds": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
+    "activeTaskIds": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
+    "openIssueIds": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
+    "currentGateId": { "anyOf": [{ "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" }, { "type": "null" }] },
+    "createdAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
+    "updatedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" }
+  }
+}
