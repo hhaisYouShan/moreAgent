@@ -1,0 +1,61 @@
+name: launch-stage9-validation-v2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - validation/second-project/itsdangerous/stage9-request.md
+      - docs/program-status.json
+      - docs/stage8-correction-report.json
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  launch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Check Stage 9 readiness
+        id: readiness
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile, appendFile } from 'node:fs/promises';
+          const status = JSON.parse(await readFile('docs/program-status.json', 'utf8'));
+          const ready = status.currentStage === 9 && status.programLifecycleStatus !== 'COMPLETED';
+          await appendFile(process.env.GITHUB_OUTPUT, `ready=${ready}\n`);
+          NODE
+      - name: Create validation branch and pull request
+        if: steps.readiness.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ci/second-project-stage9
+        run: |
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            echo "Stage 9 validation branch already exists."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          cat > .github/second-project-stage9-trigger.md <<'EOF'
+          # Stage 9 second-project validation trigger
+
+          Validation-only branch for `pallets/itsdangerous`. It must not be merged.
+          EOF
+          git add .github/second-project-stage9-trigger.md
+          git commit -m "ci: trigger Stage 9 second-project validation"
+          git push -u origin "$BRANCH"
+          gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --base main \
+            --head "$BRANCH" \
+            --title "Stage 9: validate generality with pallets/itsdangerous" \
+            --body "Validation-only PR. It validates Python, pyproject.toml, pytest and library-project compatibility through an adapter without changing Core contracts. It must not be merged."
+      - name: Report deferred launch
+        if: steps.readiness.outputs.ready != 'true'
+        run: echo "Stage 9 is not ready or the program is already complete."
