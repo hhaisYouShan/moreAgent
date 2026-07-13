@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moreagent.dev/schemas/project.schema.json",
+  "title": "Project",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "entityType", "projectId", "name", "projectType", "repository", "defaultBranch", "profileId", "createdAt", "updatedAt"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "entityType": { "const": "PROJECT" },
+    "projectId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+    "name": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+    "projectType": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/projectType" },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "owner", "name"],
+      "properties": {
+        "provider": { "enum": ["GITHUB", "LOCAL", "OTHER"] },
+        "owner": { "type": "string" },
+        "name": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "url": { "type": "string" }
+      }
+    },
+    "defaultBranch": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+    "profileId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+    "constraints": { "type": "object" },
+    "createdAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
+    "updatedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" }
+  }
+}
