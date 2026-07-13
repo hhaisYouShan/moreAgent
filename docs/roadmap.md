@@ -2,16 +2,35 @@
 
 ```yaml
 status: active
-version: 1.0
+version: 1.1
 updated_at: 2026-07-13
-current_stage: 1
+current_stage: 2
+machine_status: docs/program-status.json
 ```
 
 ## Program goal
 
 Build a project-agnostic AI Software Company OS. BossResume is the first real-project validation target after the OS completes system-level testing; it is not the current business-delivery goal.
 
+## Current progress
+
+| Stage | Status |
+|---|---|
+| Stage 1 — Repository structure and documentation source-of-truth cleanup | `COMPLETED` |
+| Stage 2 — Stabilize Domain and Schema Contracts | `IN_PROGRESS` |
+| Stage 3 — Complete the Control Plane | `NOT_STARTED` |
+| Stage 4 — Complete the Execution Plane | `NOT_STARTED` |
+| Stage 5 — Evidence, Recovery, Integration, Release, Maintenance | `NOT_STARTED` |
+| Stage 6 — Complete system-level testing | `NOT_STARTED` |
+| Stage 7 — First real-project validation with BossResume | `NOT_STARTED` |
+| Stage 8 — Correct the OS based on validation findings | `NOT_STARTED` |
+| Stage 9 — Validate generality with a second project | `NOT_STARTED` |
+
+Machine-readable progress is stored only in `docs/program-status.json`.
+
 ## Stage 1 — Repository structure and documentation source-of-truth cleanup
+
+**Status:** `COMPLETED`
 
 **Goal:** establish clear architectural boundaries and eliminate conflicting product facts.
 
@@ -22,6 +41,7 @@ Deliverables:
 - One source of truth for product goal, architecture, roadmap, migration status, runtime contracts, and runtime state.
 - Legacy and BossResume-specific documents labeled as compatibility or validation material.
 - Automated documentation-boundary verification.
+- Complete repository classification in `docs/repository-inventory.md`.
 
 Exit criteria:
 
@@ -30,7 +50,18 @@ Exit criteria:
 - Repository target structure and migration rules are approved.
 - `npm run verify:docs` passes.
 
+Completion evidence:
+
+- `README.md`
+- `docs/README.md`
+- `docs/architecture.md`
+- `docs/repository-inventory.md`
+- `docs/migration-ledger.md`
+- `scripts/verify-doc-fact-sources.mjs`
+
 ## Stage 2 — Stabilize Domain and Schema Contracts
+
+**Status:** `IN_PROGRESS`
 
 **Goal:** define stable, project-agnostic runtime language before expanding execution.
 
