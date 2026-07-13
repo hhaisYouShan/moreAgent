@@ -15,6 +15,7 @@ export const SCHEMA_FILES = Object.freeze([
   'execution.schema.json',
   'governance.schema.json',
   'evidence.schema.json',
+  'operations.schema.json',
 ]);
 
 export async function createSchemaRegistry({ root = moduleRoot } = {}) {
