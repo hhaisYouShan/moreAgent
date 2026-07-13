@@ -22,6 +22,25 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Install dependencies
-        run: npm install
-      - name: Verify
-        run: npm run verify
+        run: npm install 2>&1 | tee -a verification.log
+      - name: Syntax check
+        run: npm run check 2>&1 | tee -a verification.log
+      - name: Documentation verification
+        run: npm run verify:docs 2>&1 | tee -a verification.log
+      - name: Contract verification
+        run: npm run verify:contracts 2>&1 | tee -a verification.log
+      - name: Control Plane verification
+        run: npm run verify:control-plane 2>&1 | tee -a verification.log
+      - name: Execution Plane verification
+        run: npm run verify:execution-plane 2>&1 | tee -a verification.log
+      - name: Evidence and Operations verification
+        run: npm run verify:evidence-operations 2>&1 | tee -a verification.log
+      - name: Full regression suite
+        run: npm run test 2>&1 | tee -a verification.log
+      - name: Upload verification log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-node-${{ matrix.node-version }}
+          path: verification.log
+          if-no-files-found: error
