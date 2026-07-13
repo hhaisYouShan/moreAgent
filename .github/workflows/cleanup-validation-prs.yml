@@ -1,0 +1,32 @@
+name: cleanup-validation-prs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/program-completion.json
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Close validation-only PRs and remove branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state open \
+            --limit 100 \
+            --json number,headRefName \
+            --jq '.[] | select(.headRefName | startswith("ci/")) | [.number, .headRefName] | @tsv' \
+          | while IFS=$'\t' read -r number branch; do
+              echo "Closing validation PR #$number ($branch)"
+              gh pr close "$number" --repo "$GITHUB_REPOSITORY" --comment "Validation evidence has been recorded. This CI-only PR is closed without merge." || true
+              git push origin --delete "$branch" || true
+            done
