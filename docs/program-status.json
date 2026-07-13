@@ -1,8 +1,16 @@
 {
   "schemaVersion": "1.0",
   "program": "ai-software-company-os",
-  "updatedAt": "2026-07-13T23:25:00+08:00",
-  "currentStage": 2,
+  "updatedAt": "2026-07-14T00:05:00+08:00",
+  "currentStage": 6,
+  "latestValidation": {
+    "provider": "github-actions",
+    "workflow": "verify",
+    "runId": 29264466079,
+    "result": "SUCCESS",
+    "nodeVersions": ["20.x", "22.x"],
+    "validatedCommit": "61429f555ea71a6c744a52a42da07906a0d4fefa"
+  },
   "stages": [
     {
       "stage": 1,
@@ -21,13 +29,70 @@
     {
       "stage": 2,
       "key": "domain-and-schema-contracts",
-      "status": "IN_PROGRESS",
-      "evidence": []
+      "status": "COMPLETED",
+      "evidence": [
+        "src/domain/enums.mjs",
+        "src/contracts/schema-registry.mjs",
+        "schemas/",
+        "docs/contracts.md",
+        "test/contracts.test.mjs",
+        "test/schema-contracts.test.mjs",
+        "test/domain-contracts.test.mjs",
+        "github-actions:29264466079"
+      ]
     },
-    { "stage": 3, "key": "control-plane", "status": "NOT_STARTED", "evidence": [] },
-    { "stage": 4, "key": "execution-plane", "status": "NOT_STARTED", "evidence": [] },
-    { "stage": 5, "key": "evidence-recovery-integration-release-maintenance", "status": "NOT_STARTED", "evidence": [] },
-    { "stage": 6, "key": "system-testing", "status": "NOT_STARTED", "evidence": [] },
+    {
+      "stage": 3,
+      "key": "control-plane",
+      "status": "COMPLETED",
+      "evidence": [
+        "src/control-plane/workflow-engine.mjs",
+        "src/control-plane/dag.mjs",
+        "src/control-plane/scheduler.mjs",
+        "src/control-plane/locks.mjs",
+        "src/control-plane/gate-engine.mjs",
+        "src/control-plane/policy-engine.mjs",
+        "src/control-plane/recovery.mjs",
+        "test/control-plane.test.mjs",
+        "github-actions:29264466079"
+      ]
+    },
+    {
+      "stage": 4,
+      "key": "execution-plane",
+      "status": "COMPLETED",
+      "evidence": [
+        "src/execution/",
+        "adapters/runners/",
+        "adapters/terminals/",
+        "adapters/workspaces/",
+        "docs/execution-plane.md",
+        "test/execution-plane.test.mjs",
+        "github-actions:29264466079"
+      ]
+    },
+    {
+      "stage": 5,
+      "key": "evidence-recovery-integration-release-maintenance",
+      "status": "COMPLETED",
+      "evidence": [
+        "src/evidence/",
+        "src/integration/",
+        "src/release/",
+        "src/maintenance/",
+        "docs/evidence-and-operations.md",
+        "test/evidence-operations.test.mjs",
+        "github-actions:29264466079"
+      ]
+    },
+    {
+      "stage": 6,
+      "key": "system-testing",
+      "status": "IN_PROGRESS",
+      "evidence": [
+        "src/system/os-runtime.mjs"
+      ]
+    },
     { "stage": 7, "key": "bossresume-real-project-validation", "status": "NOT_STARTED", "evidence": [] },
     { "stage": 8, "key": "post-validation-os-correction", "status": "NOT_STARTED", "evidence": [] },
     { "stage": 9, "key": "second-project-generality-validation", "status": "NOT_STARTED", "evidence": [] }
