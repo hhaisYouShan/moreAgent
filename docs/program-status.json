@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "1.0",
+  "program": "ai-software-company-os",
+  "updatedAt": "2026-07-13T23:25:00+08:00",
+  "currentStage": 2,
+  "stages": [
+    {
+      "stage": 1,
+      "key": "repository-and-document-sources",
+      "status": "COMPLETED",
+      "evidence": [
+        "README.md",
+        "docs/README.md",
+        "docs/architecture.md",
+        "docs/roadmap.md",
+        "docs/repository-inventory.md",
+        "docs/migration-ledger.md",
+        "scripts/verify-doc-fact-sources.mjs"
+      ]
+    },
+    {
+      "stage": 2,
+      "key": "domain-and-schema-contracts",
+      "status": "IN_PROGRESS",
+      "evidence": []
+    },
+    { "stage": 3, "key": "control-plane", "status": "NOT_STARTED", "evidence": [] },
+    { "stage": 4, "key": "execution-plane", "status": "NOT_STARTED", "evidence": [] },
+    { "stage": 5, "key": "evidence-recovery-integration-release-maintenance", "status": "NOT_STARTED", "evidence": [] },
+    { "stage": 6, "key": "system-testing", "status": "NOT_STARTED", "evidence": [] },
+    { "stage": 7, "key": "bossresume-real-project-validation", "status": "NOT_STARTED", "evidence": [] },
+    { "stage": 8, "key": "post-validation-os-correction", "status": "NOT_STARTED", "evidence": [] },
+    { "stage": 9, "key": "second-project-generality-validation", "status": "NOT_STARTED", "evidence": [] }
+  ],
+  "rules": {
+    "sequential": true,
+    "bossResumeMinimumStage": 7,
+    "bossResumeRequiresStage6Completed": true,
+    "directImplementationBranch": "main"
+  }
+}
