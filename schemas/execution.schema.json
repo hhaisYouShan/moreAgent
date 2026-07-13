@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moreagent.dev/schemas/execution.schema.json",
+  "title": "Execution plane entities",
+  "oneOf": [
+    { "$ref": "#/$defs/agentContract" },
+    { "$ref": "#/$defs/agentResult" },
+    { "$ref": "#/$defs/run" },
+    { "$ref": "#/$defs/session" },
+    { "$ref": "#/$defs/workspace" }
+  ],
+  "$defs": {
+    "agentContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "entityType", "agentId", "role", "capabilities", "allowedTools", "editablePaths", "forbiddenPaths", "outputSchemaId"],
+      "properties": {
+        "schemaVersion": { "const": "1.0" },
+        "entityType": { "const": "AGENT_CONTRACT" },
+        "agentId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "role": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "capabilities": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/stringArray" },
+        "allowedTools": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/stringArray" },
+        "editablePaths": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/stringArray" },
+        "forbiddenPaths": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/stringArray" },
+        "outputSchemaId": { "type": "string", "format": "uri" },
+        "maxConcurrentRuns": { "type": "integer", "minimum": 1, "default": 1 }
+      }
+    },
+    "agentResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "entityType", "resultId", "taskId", "runId", "sessionId", "agentId", "conclusion", "changedFiles", "artifactIds", "testsRun", "issues", "startedAt", "finishedAt"],
+      "properties": {
+        "schemaVersion": { "const": "1.0" },
+        "entityType": { "const": "AGENT_RESULT" },
+        "resultId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "taskId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "runId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "sessionId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "agentId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "conclusion": { "enum": ["SUCCEEDED", "FAILED", "BLOCKED", "CANCELLED"] },
+        "changedFiles": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/stringArray" },
+        "implementedRequirementIds": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
+        "artifactIds": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
+        "testsRun": { "type": "array", "items": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/commandEvidence" } },
+        "issues": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
+        "knownRisks": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/stringArray" },
+        "sourceCommit": { "type": "string" },
+        "startedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
+        "finishedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "entityType", "runId", "taskId", "attempt", "executionKey", "status", "startedAt"],
+      "properties": {
+        "schemaVersion": { "const": "1.0" },
+        "entityType": { "const": "RUN" },
+        "runId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "taskId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "executionKey": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "status": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/runStatus" },
+        "sessionId": { "anyOf": [{ "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" }, { "type": "null" }] },
+        "workspaceId": { "anyOf": [{ "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" }, { "type": "null" }] },
+        "startedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
+        "finishedAt": { "anyOf": [{ "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" }, { "type": "null" }] },
+        "exitCode": { "anyOf": [{ "type": "integer" }, { "type": "null" }] }
+      }
+    },
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "entityType", "sessionId", "agentId", "status", "createdAt", "lastHeartbeatAt"],
+      "properties": {
+        "schemaVersion": { "const": "1.0" },
+        "entityType": { "const": "SESSION" },
+        "sessionId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "agentId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "status": { "enum": ["ACTIVE", "IDLE", "STALE", "CLOSED"] },
+        "runnerType": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "externalSessionId": { "type": ["string", "null"] },
+        "createdAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
+        "lastHeartbeatAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" }
+      }
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "entityType", "workspaceId", "projectId", "workspaceType", "path", "baseCommit", "status"],
+      "properties": {
+        "schemaVersion": { "const": "1.0" },
+        "entityType": { "const": "WORKSPACE" },
+        "workspaceId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "projectId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "workspaceType": { "enum": ["WORKTREE", "CONTAINER", "LOCAL"] },
+        "path": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "baseCommit": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "branch": { "type": ["string", "null"] },
+        "status": { "enum": ["CREATING", "READY", "IN_USE", "STALE", "RELEASING", "RELEASED", "FAILED"] }
+      }
+    }
+  }
+}
