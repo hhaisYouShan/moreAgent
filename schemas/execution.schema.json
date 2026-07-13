@@ -24,7 +24,9 @@
         "editablePaths": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/stringArray" },
         "forbiddenPaths": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/stringArray" },
         "outputSchemaId": { "type": "string", "format": "uri" },
-        "maxConcurrentRuns": { "type": "integer", "minimum": 1, "default": 1 }
+        "maxConcurrentRuns": { "type": "integer,", "minimum": 1, "default": 1 },
+        "metadata": { "type": "object" },
+        "version": { "type": "integer", "minimum": 1 }
       }
     },
     "agentResult": {
@@ -46,7 +48,7 @@
         "testsRun": { "type": "array", "items": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/commandEvidence" } },
         "issues": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
         "knownRisks": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/stringArray" },
-        "sourceCommit": { "type": "string" },
+        "sourceCommit": { "type": "string", "minLength": 7 },
         "startedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
         "finishedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" }
       }
@@ -67,13 +69,15 @@
         "workspaceId": { "anyOf": [{ "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" }, { "type": "null" }] },
         "startedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
         "finishedAt": { "anyOf": [{ "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" }, { "type": "null" }] },
-        "exitCode": { "anyOf": [{ "type": "integer" }, { "type": "null" }] }
+        "exitCode": { "anyOf": [{ "type": "integer" }, { "type": "null" }] },
+        "sideEffectsCommitted": { "type": "boolean" },
+        "failureReason": { "type": ["string", "null"] }
       }
     },
     "session": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schemaVersion", "entityType", "sessionId", "agentId", "status", "createdAt", "lastHeartbeatAt"],
+      "required": ["schemaVersion", "entityType", "sessionId", "agentId", "status", "runnerType", "createdAt", "lastHeartbeatAt", "version"],
       "properties": {
         "schemaVersion": { "const": "1.0" },
         "entityType": { "const": "SESSION" },
@@ -83,23 +87,35 @@
         "runnerType": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
         "externalSessionId": { "type": ["string", "null"] },
         "createdAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
-        "lastHeartbeatAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" }
+        "lastHeartbeatAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
+        "closedAt": { "type": ["string", "null"], "format": "date-time" },
+        "metadata": { "type": "object" },
+        "version": { "type": "integer", "minimum": 1 }
       }
     },
     "workspace": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schemaVersion", "entityType", "workspaceId", "projectId", "workspaceType", "path", "baseCommit", "status"],
+      "required": ["schemaVersion", "entityType", "workspaceId", "projectId", "taskId", "providerId", "workspaceType", "path", "baseCommit", "status", "createdAt", "updatedAt", "version"],
       "properties": {
         "schemaVersion": { "const": "1.0" },
         "entityType": { "const": "WORKSPACE" },
         "workspaceId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
         "projectId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "taskId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "providerId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
         "workspaceType": { "enum": ["WORKTREE", "CONTAINER", "LOCAL"] },
-        "path": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "path": { "type": "string" },
         "baseCommit": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
         "branch": { "type": ["string", "null"] },
-        "status": { "enum": ["CREATING", "READY", "IN_USE", "STALE", "RELEASING", "RELEASED", "FAILED"] }
+        "status": { "enum": ["CREATING", "READY", "IN_USE", "STALE", "RELEASING", "RELEASED", "FAILED"] },
+        "createdAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
+        "updatedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
+        "releasedAt": { "type": ["string", "null"], "format": "date-time" },
+        "failureReason": { "type": ["string", "null"] },
+        "metadata": { "type": "object" },
+        "providerMetadata": { "type": "object" },
+        "version": { "type": "integer", "minimum": 1 }
       }
     }
   }
