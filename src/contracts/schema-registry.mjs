@@ -11,6 +11,7 @@ export const SCHEMA_FILES = Object.freeze([
   'project.schema.json',
   'workflow.schema.json',
   'task.schema.json',
+  'work.schema.json',
   'execution.schema.json',
   'governance.schema.json',
   'evidence.schema.json',
