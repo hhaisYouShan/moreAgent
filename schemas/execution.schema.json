@@ -24,7 +24,7 @@
         "editablePaths": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/stringArray" },
         "forbiddenPaths": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/stringArray" },
         "outputSchemaId": { "type": "string", "format": "uri" },
-        "maxConcurrentRuns": { "type": "integer,", "minimum": 1, "default": 1 },
+        "maxConcurrentRuns": { "type": "integer", "minimum": 1, "default": 1 },
         "metadata": { "type": "object" },
         "version": { "type": "integer", "minimum": 1 }
       }
