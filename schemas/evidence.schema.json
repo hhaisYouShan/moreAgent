@@ -16,7 +16,7 @@
     "artifact": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schemaVersion", "entityType", "artifactId", "logicalKey", "artifactType", "version", "status", "hash", "projectId", "workflowId", "producedBy", "createdAt"],
+      "required": ["schemaVersion", "entityType", "artifactId", "logicalKey", "artifactType", "version", "status", "hash", "projectId", "workflowId", "producedBy", "location", "createdAt", "updatedAt"],
       "properties": {
         "schemaVersion": { "const": "1.0" },
         "entityType": { "const": "ARTIFACT" },
@@ -28,14 +28,18 @@
         "hash": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/sha256" },
         "projectId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
         "workflowId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
-        "phase": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/workflowPhase" },
-        "taskId": { "type": ["string", "null"] },
+        "phase": { "anyOf": [{ "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/workflowPhase" }, { "type": "null" }] },
+        "taskId": { "anyOf": [{ "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" }, { "type": "null" }] },
         "producedBy": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
         "sourceCommit": { "type": ["string", "null"] },
         "inputHash": { "anyOf": [{ "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/sha256" }, { "type": "null" }] },
-        "supersedes": { "type": ["string", "null"] },
+        "supersedes": { "anyOf": [{ "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" }, { "type": "null" }] },
+        "supersededBy": { "anyOf": [{ "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" }, { "type": "null" }] },
         "location": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
-        "createdAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" }
+        "metadata": { "type": "object" },
+        "rejectionReason": { "type": ["string", "null"] },
+        "createdAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
+        "updatedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" }
       }
     },
     "evidence": {
@@ -81,7 +85,7 @@
     "projectMap": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schemaVersion", "entityType", "projectMapId", "projectId", "baseCommit", "hash", "modules", "generatedAt"],
+      "required": ["schemaVersion", "entityType", "projectMapId", "projectId", "baseCommit", "hash", "modules", "metadata", "generatedAt", "status"],
       "properties": {
         "schemaVersion": { "const": "1.0" },
         "entityType": { "const": "PROJECT_MAP" },
@@ -90,13 +94,16 @@
         "baseCommit": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
         "hash": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/sha256" },
         "modules": { "type": "array", "items": { "type": "object" } },
-        "generatedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" }
+        "metadata": { "type": "object" },
+        "generatedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
+        "status": { "enum": ["ACTIVE", "SUPERSEDED"] },
+        "supersededBy": { "anyOf": [{ "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" }, { "type": "null" }] }
       }
     },
     "requirementTrace": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schemaVersion", "entityType", "traceId", "projectId", "workflowId", "requirementId", "links", "updatedAt"],
+      "required": ["schemaVersion", "entityType", "traceId", "projectId", "workflowId", "requirementId", "links", "updatedAt", "version"],
       "properties": {
         "schemaVersion": { "const": "1.0" },
         "entityType": { "const": "REQUIREMENT_TRACE" },
@@ -107,6 +114,7 @@
         "links": {
           "type": "object",
           "additionalProperties": false,
+          "required": ["designArtifactIds", "taskIds", "commitShas", "testEvidenceIds", "gateIds", "acceptanceIds"],
           "properties": {
             "designArtifactIds": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
             "taskIds": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
@@ -116,13 +124,14 @@
             "acceptanceIds": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" }
           }
         },
-        "updatedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" }
+        "updatedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
+        "version": { "type": "integer", "minimum": 1 }
       }
     },
     "contextManifest": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schemaVersion", "entityType", "contextManifestId", "taskId", "inputHash", "projectMapId", "files", "artifactIds", "decisionIds", "editablePaths", "forbiddenPaths", "createdAt"],
+      "required": ["schemaVersion", "entityType", "contextManifestId", "taskId", "inputHash", "projectMapId", "projectId", "files", "artifactIds", "decisionIds", "editablePaths", "forbiddenPaths", "createdAt", "status"],
       "properties": {
         "schemaVersion": { "const": "1.0" },
         "entityType": { "const": "CONTEXT_MANIFEST" },
@@ -130,20 +139,23 @@
         "taskId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
         "inputHash": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/sha256" },
         "projectMapId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
-        "files": { "type": "array", "items": { "type": "object", "required": ["path", "hash"], "properties": { "path": { "type": "string" }, "hash": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/sha256" } } },
+        "projectId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "files": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["path", "hash"], "properties": { "path": { "type": "string" }, "hash": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/sha256" } } },
         "artifactIds": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
         "decisionIds": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
         "editablePaths": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/stringArray" },
         "forbiddenPaths": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/stringArray" },
         "tokenBudget": { "type": "integer", "minimum": 0 },
         "createdAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
-        "expiresAt": { "type": ["string", "null"], "format": "date-time" }
+        "expiresAt": { "type": ["string", "null"], "format": "date-time" },
+        "status": { "enum": ["ACTIVE", "INVALID"] },
+        "invalidationReason": { "type": ["string", "null"] }
       }
     },
     "integrationEvidence": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schemaVersion", "entityType", "integrationEvidenceId", "projectId", "workflowId", "baseCommit", "taskCommits", "integrationCommit", "conflicts", "verificationResults", "changedFiles", "requirementIds", "createdAt"],
+      "required": ["schemaVersion", "entityType", "integrationEvidenceId", "projectId", "workflowId", "baseCommit", "taskCommits", "integrationBranch", "integrationCommit", "conflicts", "mergeResults", "verificationResults", "changedFiles", "requirementIds", "createdAt"],
       "properties": {
         "schemaVersion": { "const": "1.0" },
         "entityType": { "const": "INTEGRATION_EVIDENCE" },
@@ -152,8 +164,10 @@
         "workflowId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
         "baseCommit": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
         "taskCommits": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/stringArray" },
-        "integrationCommit": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "integrationBranch": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "integrationCommit": { "type": ["string", "null"] },
         "conflicts": { "type": "array", "items": { "type": "object" } },
+        "mergeResults": { "type": "array", "items": { "type": "object" } },
         "verificationResults": { "type": "array", "items": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/commandEvidence" } },
         "changedFiles": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/stringArray" },
         "requirementIds": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
@@ -163,20 +177,29 @@
     "releaseEvidence": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schemaVersion", "entityType", "releaseEvidenceId", "projectId", "workflowId", "integrationCommit", "targetEnvironment", "migrationResults", "healthChecks", "rollbackPlan", "status", "createdAt"],
+      "required": ["schemaVersion", "entityType", "releaseEvidenceId", "releaseId", "projectId", "workflowId", "integrationCommit", "targetEnvironment", "userAcceptanceId", "migrationResults", "releaseResults", "healthChecks", "rollbackPlan", "rollbackResults", "status", "createdAt", "finishedAt"],
       "properties": {
         "schemaVersion": { "const": "1.0" },
         "entityType": { "const": "RELEASE_EVIDENCE" },
         "releaseEvidenceId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "releaseId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
         "projectId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
         "workflowId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
         "integrationCommit": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
         "targetEnvironment": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "userAcceptanceId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "riskApprovalId": { "anyOf": [{ "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" }, { "type": "null" }] },
         "migrationResults": { "type": "array", "items": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/commandEvidence" } },
+        "releaseResults": { "type": "array", "items": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/commandEvidence" } },
         "healthChecks": { "type": "array", "items": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/commandEvidence" } },
         "rollbackPlan": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "rollbackResults": { "type": "array", "items": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/commandEvidence" } },
         "status": { "enum": ["PLANNED", "RELEASED", "ROLLED_BACK", "FAILED"] },
-        "createdAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" }
+        "failureStage": { "type": ["string", "null"] },
+        "failureReason": { "type": ["string", "null"] },
+        "rollbackFailure": { "type": ["string", "null"] },
+        "createdAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
+        "finishedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" }
       }
     }
   }
