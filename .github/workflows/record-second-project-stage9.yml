@@ -1,0 +1,63 @@
+name: record-second-project-stage9
+
+on:
+  workflow_run:
+    workflows: [second-project-stage9-validation]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  record:
+    if: >-
+      github.event.workflow_run.head_branch == 'ci/second-project-stage9' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    concurrency:
+      group: record-second-project-stage9
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+      - name: Download Stage 9 validation evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          mkdir -p /tmp/second-project-stage9
+          gh run download "$RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name second-project-stage9-validation \
+            --dir /tmp/second-project-stage9 || true
+      - name: Record Stage 9 and apply final Program Gate
+        env:
+          STAGE9_ARTIFACT_DIR: /tmp/second-project-stage9
+          VALIDATION_WORKFLOW: second-project-stage9-validation
+          VALIDATION_RUN_ID: ${{ github.event.workflow_run.id }}
+          VALIDATION_RUN_URL: ${{ github.event.workflow_run.html_url }}
+          VALIDATION_RESULT: ${{ github.event.workflow_run.conclusion }}
+          VALIDATION_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          VALIDATION_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: node scripts/record-stage9-validation.mjs
+      - name: Verify legacy-compatible program state
+        run: node scripts/verify-doc-fact-sources.mjs
+      - name: Commit final validation evidence
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/program-status.json docs/roadmap.md docs/stage9-validation-report.json validation/second-project/itsdangerous/results
+          if [ -f docs/program-completion.json ]; then git add docs/program-completion.json; fi
+          if git diff --cached --quiet; then
+            echo "No Stage 9 evidence changes to commit."
+            exit 0
+          fi
+          git commit -m "docs: record Stage 9 generality validation"
+          git pull --rebase origin main
+          git push origin HEAD:main
