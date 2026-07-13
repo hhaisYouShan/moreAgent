@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "1.0",
+  "profileType": "VALIDATION_ACCEPTANCE_PROFILE",
+  "profileId": "bossresume-stage7-acceptance",
+  "projectId": "bossresume",
+  "requiredChecks": [
+    "BASELINE_COMMIT_RECORDED",
+    "REQUIRED_PATHS_PRESENT",
+    "MANIFESTS_PARSE",
+    "PROJECT_MAP_GENERATED",
+    "PRD_HASH_RECORDED",
+    "NO_BUSINESS_CODE_MODIFIED",
+    "NO_SECRET_FILE_READ",
+    "TASK_DAG_VALID",
+    "POLICY_DRY_RUN_PASS",
+    "EPHEMERAL_WORKTREE_CREATED",
+    "REAL_GIT_INTEGRATION_COMMIT_CREATED",
+    "INTEGRATION_WORKTREE_REMOVED",
+    "AVAILABLE_BUILD_TEST_COMMANDS_EXECUTED",
+    "REQUIREMENT_TRACE_COMPLETE_FOR_VALIDATION_SCOPE",
+    "NO_OPEN_BLOCKING_OR_MAJOR_OS_FINDING"
+  ],
+  "requiredArtifacts": [
+    "bossresume-baseline-report.json",
+    "bossresume-project-map.json",
+    "bossresume-prd-ingestion.json",
+    "bossresume-task-dag.json",
+    "bossresume-policy-dry-run.json",
+    "bossresume-integration-evidence.json",
+    "bossresume-validation-report.json"
+  ],
+  "completionRule": {
+    "allRequiredChecksPass": true,
+    "openBlockingCount": 0,
+    "openMajorCount": 0,
+    "businessCodeChangesAllowed": false,
+    "remotePushAllowed": false,
+    "productAcceptanceImplied": false,
+    "userAcceptanceImplied": false
+  },
+  "findingClassification": [
+    "CORE",
+    "PROFILE",
+    "ADAPTER",
+    "DOCUMENTATION",
+    "BOSSRESUME_PROJECT",
+    "ENVIRONMENT"
+  ]
+}
