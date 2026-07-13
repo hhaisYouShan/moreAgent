@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moreagent.dev/schemas/operations.schema.json",
+  "title": "Operations and maintenance entities",
+  "oneOf": [
+    { "$ref": "#/$defs/incident" },
+    { "$ref": "#/$defs/maintenanceItem" },
+    { "$ref": "#/$defs/workflowSeed" }
+  ],
+  "$defs": {
+    "incident": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "entityType", "incidentId", "projectId", "workflowId", "releaseId", "integrationCommit", "targetEnvironment", "severity", "status", "failureStage", "failureReason", "evidenceId", "createdAt"],
+      "properties": {
+        "schemaVersion": { "const": "1.0" },
+        "entityType": { "const": "INCIDENT" },
+        "incidentId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "projectId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "workflowId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "releaseId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "integrationCommit": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "targetEnvironment": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "severity": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/issueSeverity" },
+        "status": { "enum": ["OPEN", "MITIGATED", "RESOLVED", "CLOSED"] },
+        "failureStage": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "failureReason": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "rollbackFailure": { "type": ["string", "null"] },
+        "evidenceId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "createdAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" }
+      }
+    },
+    "maintenanceItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "entityType", "itemId", "itemType", "projectId", "workflowId", "summary", "priority", "status", "targetPhase", "primaryOwnerRole", "requiredEvidence", "missingEvidence", "evidence", "createdAt", "nextAction"],
+      "properties": {
+        "schemaVersion": { "const": "1.0" },
+        "entityType": { "const": "MAINTENANCE_ITEM" },
+        "itemId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "itemType": { "enum": ["INCIDENT", "SECURITY", "BUG", "PERFORMANCE", "DEPENDENCY_UPDATE", "CHANGE_REQUEST", "EXPERIENCE", "OBSERVABILITY"] },
+        "projectId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "workflowId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "summary": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "severity": { "anyOf": [{ "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/issueSeverity" }, { "type": "null" }] },
+        "priority": { "enum": ["P0", "P1", "P2", "P3"] },
+        "status": { "enum": ["NEEDS_EVIDENCE", "READY"] },
+        "targetPhase": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/workflowPhase" },
+        "primaryOwnerRole": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "requiredEvidence": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/stringArray" },
+        "missingEvidence": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/stringArray" },
+        "evidence": { "type": "object" },
+        "createdAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
+        "nextAction": { "enum": ["CREATE_MAINTENANCE_WORKFLOW", "COLLECT_REQUIRED_EVIDENCE"] }
+      }
+    },
+    "workflowSeed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "entityType", "projectId", "parentWorkflowId", "sourceItemId", "goal", "initialPhase", "ownerRole", "priority", "evidence"],
+      "properties": {
+        "schemaVersion": { "const": "1.0" },
+        "entityType": { "const": "WORKFLOW_SEED" },
+        "projectId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "parentWorkflowId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "sourceItemId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "goal": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "initialPhase": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/workflowPhase" },
+        "ownerRole": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "priority": { "enum": ["P0", "P1", "P2", "P3"] },
+        "evidence": { "type": "object" }
+      }
+    }
+  }
+}
