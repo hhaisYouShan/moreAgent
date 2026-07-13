@@ -60,8 +60,12 @@ export function transitionWorkflow({ workflow, toPhase = workflow?.phase, toStat
   if (statusChanged && !canTransitionStatus(workflow.status, toStatus)) {
     throw transitionError('INVALID_STATUS_TRANSITION', `Cannot transition status ${workflow.status} -> ${toStatus}.`);
   }
-  if (phaseChanged && !['RUNNING', 'READY', 'WAITING'].includes(toStatus)) {
-    throw transitionError('INVALID_PHASE_STATUS', 'A phase change requires READY, RUNNING, or WAITING status.');
+
+  const validPhaseStatuses = toPhase === WorkflowPhase.ARCHIVED
+    ? [WorkflowStatus.ARCHIVED]
+    : [WorkflowStatus.RUNNING, WorkflowStatus.READY, WorkflowStatus.WAITING];
+  if (phaseChanged && !validPhaseStatuses.includes(toStatus)) {
+    throw transitionError('INVALID_PHASE_STATUS', `Phase ${toPhase} requires one of: ${validPhaseStatuses.join(', ')}.`);
   }
   if (toPhase === WorkflowPhase.ARCHIVED && toStatus !== WorkflowStatus.ARCHIVED) {
     throw transitionError('ARCHIVE_STATUS_REQUIRED', 'ARCHIVED phase requires ARCHIVED status.');
