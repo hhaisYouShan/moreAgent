@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0",
+  "issue_id": "SYSTEM-STATE-SOURCE-SPLIT-20260713",
+  "issue_signature": "state_source_split:bossresume-full-refactor",
+  "project_id": "bossresume",
+  "feature_key": "bossresume-full-refactor",
+  "category": "SYSTEM",
+  "severity": "BLOCKING",
+  "status": "CLOSED",
+  "decision_type": "AUTO_FIXABLE",
+  "failure_reason": "state_source_split",
+  "owner_agent": "gate_verifier",
+  "requires_user_decision": false,
+  "source": "Codex full PR #30 review",
+  "evidence": [
+    "agent-loop-docs/process/workflow-state.json",
+    ".agent-runs/current-run.json (local runtime)",
+    ".agent-runs/current-tasks.json (local runtime)",
+    ".agent-runs/current-events.jsonl (local runtime)",
+    "git worktree list --porcelain"
+  ],
+  "problem": "Workflow State, Current Run/Task/Event, referenced Artifact and Worktree facts are inconsistent. The Product Review run cannot be accepted or safely discarded without preserving evidence and reconciling all state sources.",
+  "impact": "M0 cannot be approved; Product Agent, business PRD edits and business-code development are blocked.",
+  "expected_fix": "已修复：Reconcile 先同步 JSON / Markdown / Round Context 并清理运行态；仅在最终诊断无分裂、无缺失 Artifact、无 orphan/prunable Worktree 时受控迁移到 READY。",
+  "verification": "2026-07-13：npm run agent:test:control-plane（15/15 PASS）；npm run agent:reconcile -- --apply --prune-worktrees --remove-orphan-worktrees（exit 0）；后续只读 reconcile（splitDetected=false，exit 0）；status/jobs/logs 与 Workflow JSON/Markdown/Round Context、Current Run/Task/Event 和 Worktree 一致。M0 effectiveApproval=false，Product Agent 未启动。",
+  "created_at": "2026-07-13T16:30:00+08:00",
+  "resolved_at": "2026-07-13T19:21:41+08:00",
+  "resolved_by": "gate_verifier",
+  "resolution": "Reconcile Evidence 已生成 RECONCILED，运行态已复位为 IDLE，Workflow 已受控进入 READY；M0 仍需独立结构化 APPROVED Result。"
+}

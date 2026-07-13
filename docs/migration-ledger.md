@@ -2,6 +2,10 @@
 
 Source baseline: `hhaisYouShan/bossResume@d400f508ecaeb0cf20b8c6dae7b182af0111ffd2`.
 
+Direct compatibility migration: `scripts/agent-loop/**` and
+`agent-loop-docs/**` are now active MoreAgent files. The source snapshot is
+protected by BossResume tag `bossresume-before-moreagent-migration-20260713`.
+
 Status vocabulary:
 
 ```text

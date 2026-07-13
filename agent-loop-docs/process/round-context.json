@@ -1,0 +1,30 @@
+{
+  "workflow_id": "bossresume-full-refactor",
+  "feature_key": "bossresume-full-refactor",
+  "prd_path": "docs/prd/bossresume-full-refactor-prd.md",
+  "project_type": "existing_refactor",
+  "product_prd_edit_mode": "review_only",
+  "status": "READY",
+  "step": "PLAN",
+  "phase": "INTAKE",
+  "workflow_round": 0,
+  "gate": "NONE",
+  "gate_status": "DRAFT",
+  "active_agent": "gate_verifier",
+  "owner_agent": "gate_verifier",
+  "failure_reason": null,
+  "retry_count": 0,
+  "latest_decision_file": null,
+  "latest_issue_file": ".agent-runs/reconciled/2026-07-13T11-21-41-032Z/reconciliation.json",
+  "confirmed_decisions_file": "agent-loop-docs/process/confirmed-decisions.json",
+  "audit_events_file": "agent-loop-docs/process/audit-events.jsonl",
+  "workflow_state_json": "agent-loop-docs/process/workflow-state.json",
+  "workflow_state_md": "agent-loop-docs/process/workflow-state.md",
+  "input_search_patterns": [
+    "agent-loop-docs/reviews/bossresume-full-refactor-*-round-*.md",
+    "agent-loop-docs/gate-results/bossresume-full-refactor-*-round-*.json",
+    "agent-loop-docs/decisions/bossresume-full-refactor-*-round-*.md",
+    "agent-loop-docs/issues/bossresume-full-refactor-issues-round-*.md"
+  ],
+  "updated_at": "2026-07-13T11:21:41.155Z"
+}

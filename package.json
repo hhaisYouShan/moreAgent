@@ -8,6 +8,17 @@
     "moreagent": "./src/cli.mjs"
   },
   "scripts": {
+    "agent": "node scripts/agent-loop/cli.mjs",
+    "agent:status": "node scripts/agent-loop/status.mjs",
+    "agent:brain": "node scripts/agent-loop/brain-chat.mjs",
+    "agent:brain:dry-run": "node scripts/agent-loop/brain-chat.mjs --dry-run",
+    "agent:state": "node scripts/agent-loop/state-cli.mjs",
+    "agent:loop": "node scripts/agent-loop/orchestrator.mjs",
+    "agent:loop:dry-run": "node scripts/agent-loop/orchestrator.mjs --dry-run",
+    "agent:loop:verify": "node scripts/agent-loop/verify.mjs",
+    "agent:checkpoint": "node scripts/agent-loop/checkpoint.mjs",
+    "agent:reconcile": "node scripts/agent-loop/reconcile-state-sources.mjs",
+    "agent:test:control-plane": "node --test scripts/agent-loop/tests/m0-guard.test.mjs scripts/agent-loop/tests/state-reconcile.test.mjs scripts/agent-loop/tests/gate-allowlist.test.mjs",
     "check": "node --check src/cli.mjs && node --check src/core/state-sources.mjs && node --check src/core/reconcile.mjs && node --check src/contracts/gates.mjs && node --check src/contracts/self-check.mjs && node --check src/contracts/issues.mjs && node --check src/contracts/checkpoint.mjs && node --check src/runtime/lifecycle.mjs && node --check src/runtime/worktrees.mjs && node --check src/runtime/planner.mjs && node --check src/runtime/orchestrator.mjs",
     "test": "node --test test/*.test.mjs",
     "verify": "npm run check && npm run test"
