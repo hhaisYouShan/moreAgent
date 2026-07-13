@@ -12,6 +12,9 @@ const canonicalDocuments = [
   'docs/program-status.json',
   'docs/repository-inventory.md',
   'docs/migration-ledger.md',
+  'docs/contracts.md',
+  'docs/execution-plane.md',
+  'docs/evidence-and-operations.md',
 ];
 const boundaryDocuments = [
   'profiles/README.md',
@@ -62,13 +65,24 @@ const stages = Array.isArray(programStatus?.stages) ? programStatus.stages : [];
 if (stages.length !== 9) errors.push('docs/program-status.json: exactly 9 stages are required');
 for (let stage = 1; stage <= 9; stage += 1) {
   const record = stages.find((item) => item?.stage === stage);
-  if (!record) errors.push(`docs/program-status.json: missing stage ${stage}`);
+  if (!record) {
+    errors.push(`docs/program-status.json: missing stage ${stage}`);
+    continue;
+  }
+  const expectedStatus = stage < currentStage ? 'COMPLETED' : stage === currentStage ? 'IN_PROGRESS' : 'NOT_STARTED';
+  if (record.status !== expectedStatus) {
+    errors.push(`docs/program-status.json: Stage ${stage} must be ${expectedStatus} when currentStage=${currentStage}`);
+  }
+  if (record.status === 'COMPLETED' && (!Array.isArray(record.evidence) || !record.evidence.length)) {
+    errors.push(`docs/program-status.json: completed Stage ${stage} requires evidence`);
+  }
 }
-const stage1 = stages.find((item) => item?.stage === 1);
-if (stage1?.status !== 'COMPLETED') errors.push('docs/program-status.json: Stage 1 must be COMPLETED after repository inventory');
-if (currentStage === 2) {
-  const stage2 = stages.find((item) => item?.stage === 2);
-  if (stage2?.status !== 'IN_PROGRESS') errors.push('docs/program-status.json: Stage 2 must be IN_PROGRESS when currentStage=2');
+
+if (programStatus?.rules?.sequential !== true) errors.push('docs/program-status.json: sequential rule must remain true');
+if (programStatus?.rules?.bossResumeMinimumStage !== 7) errors.push('docs/program-status.json: BossResume minimum stage must remain 7');
+if (programStatus?.rules?.bossResumeRequiresStage6Completed !== true) errors.push('docs/program-status.json: BossResume must require Stage 6 completion');
+if (currentStage >= 3 && programStatus?.latestValidation?.result !== 'SUCCESS') {
+  errors.push('docs/program-status.json: advanced stages require a successful validation record');
 }
 
 if (!/(Stage 7[^\n]*BossResume|BossResume[^\n]*Stage 7)/i.test(roadmap)) {
@@ -97,7 +111,7 @@ if (!/(Stage 7[^\n]*BossResume|BossResume[^\n]*Stage 7)/i.test(validationBoundar
 }
 
 const bossResumeValidation = await safeRead('validation/bossresume/README.md');
-if (!/inactive until Stage 6 system-level testing is approved/i.test(bossResumeValidation)) {
+if (currentStage < 7 && !/inactive until Stage 6 system-level testing is approved/i.test(bossResumeValidation)) {
   errors.push('validation/bossresume/README.md: must remain inactive until Stage 6 approval');
 }
 
@@ -112,7 +126,7 @@ console.log(`- canonical documents: ${canonicalDocuments.length}`);
 console.log(`- repository boundary documents: ${boundaryDocuments.length}`);
 console.log('- roadmap stages: 9');
 console.log(`- current stage: ${currentStage}`);
-console.log('- Stage 1: COMPLETED');
+console.log(`- completed stages: ${Math.max(0, currentStage - 1)}`);
 console.log('- BossResume role: Stage 7 real-project validation');
 
 async function exists(relativePath) {
