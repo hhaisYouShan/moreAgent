@@ -21,6 +21,7 @@ export async function createSchemaRegistry({ root = moduleRoot } = {}) {
   const ajv = new Ajv2020({
     allErrors: true,
     strict: true,
+    allowUnionTypes: true,
     validateFormats: true,
   });
   addFormats(ajv);
