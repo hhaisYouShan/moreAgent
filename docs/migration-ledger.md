@@ -13,7 +13,7 @@ REFERENCE -> EXTRACTING -> DUAL_RUN_PASS -> SWITCHED -> DELETABLE -> REMOVED
 | State-source inspection | `state.mjs`, `reconcile-state-sources.mjs` | `src/core/state-sources.mjs` | `DUAL_RUN_PASS` | Keep read-only until generic apply passes |
 | Reconcile apply and evidence | `reconcile-state-sources.mjs`, `run-status.mjs` | `src/core/reconcile.mjs` | `EXTRACTING` | Preserve pointers, worktrees and M0 boundary |
 | Workflow state presentation | `state.mjs`, `state-cli.mjs`, `status.mjs` | `src/core/state.mjs`, adapter renderer | `REFERENCE` | JSON, Markdown and Round Context parity |
-| Gate and Issue contracts | `gate.mjs`, `gate-result-validator.mjs`, `issue-router.mjs` | `src/contracts/` | `REFERENCE` | Registered gates and structured Issue parity |
+| Gate and Issue contracts | `gate.mjs`, `gate-result-validator.mjs`, `issue-router.mjs` | `src/contracts/` | `EXTRACTING` | Registered gates and structured Issue parity |
 | Run, task and event lifecycle | `run-status.mjs`, `persistence.mjs` | `src/runtime/` | `REFERENCE` | Resume and stale-pointer cases pass |
 | Worktree lifecycle | `worktree.mjs`, `worktree-manifest.mjs`, `merge-steward.mjs` | `src/runtime/worktrees.mjs` | `REFERENCE` | No orphan/prunable regression |
 | Planner and orchestration | `planner.mjs`, `orchestrator.mjs`, `task-context.mjs` | `src/runtime/` | `REFERENCE` | Same task DAG and allowed scope |
