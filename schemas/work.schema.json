@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moreagent.dev/schemas/work.schema.json",
+  "title": "Workstream and Attempt entities",
+  "oneOf": [
+    { "$ref": "#/$defs/workstream" },
+    { "$ref": "#/$defs/attempt" }
+  ],
+  "$defs": {
+    "workstream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "entityType", "workstreamId", "workflowId", "ownerAgent", "status", "taskIds", "baselineCommit", "inputHash", "createdAt", "updatedAt"],
+      "properties": {
+        "schemaVersion": { "const": "1.0" },
+        "entityType": { "const": "WORKSTREAM" },
+        "workstreamId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "workflowId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "ownerAgent": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "status": { "enum": ["PLANNED", "ACTIVE", "WAITING", "BLOCKED", "COMPLETED", "FAILED", "CANCELLED"] },
+        "taskIds": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
+        "currentTaskId": { "type": ["string", "null"] },
+        "sessionId": { "type": ["string", "null"] },
+        "workspaceId": { "type": ["string", "null"] },
+        "baselineCommit": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/nonEmptyString" },
+        "inputHash": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/sha256" },
+        "activeIssueIds": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
+        "createdAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
+        "updatedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" }
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "entityType", "attemptId", "taskId", "workstreamId", "attemptNumber", "attemptType", "status", "inputHash", "startedAt"],
+      "properties": {
+        "schemaVersion": { "const": "1.0" },
+        "entityType": { "const": "ATTEMPT" },
+        "attemptId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "taskId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "workstreamId": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/id" },
+        "runId": { "type": ["string", "null"] },
+        "attemptNumber": { "type": "integer", "minimum": 1 },
+        "attemptType": { "enum": ["INITIAL", "REPAIR", "RECHECK", "REVERIFY"] },
+        "status": { "enum": ["PLANNED", "RUNNING", "SUCCEEDED", "FAILED", "BLOCKED", "CANCELLED", "TIMED_OUT", "STALE"] },
+        "inputHash": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/sha256" },
+        "issueIds": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/idArray" },
+        "startedAt": { "$ref": "https://moreagent.dev/schemas/common.schema.json#/$defs/isoDateTime" },
+        "finishedAt": { "type": ["string", "null"], "format": "date-time" }
+      }
+    }
+  }
+}
