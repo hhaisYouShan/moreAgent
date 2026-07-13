@@ -1,0 +1,60 @@
+name: launch-stage7-v3
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - validation/bossresume/stage7-v3-request.md
+      - docs/program-status.json
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  launch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Check Stage 7 readiness
+        id: readiness
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile, appendFile } from 'node:fs/promises';
+          const status = JSON.parse(await readFile('docs/program-status.json', 'utf8'));
+          const ready = status.currentStage === 7;
+          await appendFile(process.env.GITHUB_OUTPUT, `ready=${ready}\n`);
+          NODE
+      - name: Create Stage 7 V3 validation PR
+        if: steps.readiness.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ci/bossresume-stage7-v3
+        run: |
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            echo "Stage 7 V3 validation branch already exists."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          cat > .github/bossresume-stage7-trigger.md <<'EOF'
+          # BossResume Stage 7 V3 trigger
+
+          Validation-only branch. OS compatibility findings and BossResume project findings are evaluated separately. This branch must not be merged.
+          EOF
+          git add .github/bossresume-stage7-trigger.md
+          git commit -m "ci: trigger OS-scoped BossResume validation"
+          git push -u origin "$BRANCH"
+          gh pr create \
+            --repo "$GITHUB_REPOSITORY" \
+            --base main \
+            --head "$BRANCH" \
+            --title "Stage 7 V3: OS-scoped BossResume validation" \
+            --body "Validation-only PR. It records BossResume project findings without misclassifying them as Core failures. It must not be merged."
+      - name: Report skipped Stage 7 rerun
+        if: steps.readiness.outputs.ready != 'true'
+        run: echo "Stage 7 has already advanced; V3 rerun is not required."
