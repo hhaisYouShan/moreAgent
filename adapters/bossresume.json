@@ -1,0 +1,70 @@
+{
+  "schemaVersion": "1.0",
+  "project": {
+    "id": "bossresume",
+    "displayName": "BossResume",
+    "prdPath": "docs/prd/bossresume-full-refactor-prd.md"
+  },
+  "paths": {
+    "workflowJson": "agent-loop-docs/process/workflow-state.json",
+    "workflowMarkdown": "agent-loop-docs/process/workflow-state.md",
+    "roundContext": "agent-loop-docs/process/round-context.json",
+    "currentRun": ".agent-runs/current-run.json",
+    "currentTasks": ".agent-runs/current-tasks.json",
+    "currentEvents": ".agent-runs/current-events.jsonl",
+    "agentWorktrees": ".agent-worktrees"
+  },
+  "fields": {
+    "status": "workflowStatus",
+    "step": "step",
+    "phase": "phase",
+    "round": "round",
+    "gate": "gate",
+    "gateStatus": "gateStatus",
+    "activeAgent": "activeAgent",
+    "ownerAgent": "ownerAgent",
+    "failureReason": "failureReason"
+  },
+  "roundContextFields": {
+    "status": "status",
+    "step": "step",
+    "phase": "phase",
+    "round": "workflow_round",
+    "gate": "gate",
+    "gateStatus": "gate_status",
+    "activeAgent": "active_agent",
+    "ownerAgent": "owner_agent",
+    "failureReason": "failure_reason"
+  },
+  "criticalFields": ["status", "step", "phase", "round", "gate", "gateStatus", "activeAgent", "ownerAgent", "failureReason"],
+  "nullValues": ["N/A", "null"],
+  "markdownPatterns": {
+    "status": "- status：`?([^`\\n]+)`?",
+    "step": "- step：`?([^`\\n]+)`?",
+    "phase": "- phase：`?([^`\\n]+)`?",
+    "round": "当前轮次：`?(\\d+)`?",
+    "gate": "当前 Gate：`?([^`\\n]+)`?",
+    "gateStatus": "Gate 状态：`?([^`\\n]+)`?",
+    "activeAgent": "- active_agent：`?([^`\\n]+)`?",
+    "ownerAgent": "- owner_agent：`?([^`\\n]+)`?",
+    "failureReason": "- failure_reason：`?([^`\\n]+)`?"
+  },
+  "runtime": {
+    "runIdField": "runId",
+    "runStatusField": "status",
+    "runPhaseField": "phase",
+    "taskIdField": "taskId",
+    "terminalRunStatuses": ["IDLE", "FINISHED", "DONE", "FAILED", "TIMEOUT", "BLOCKED"],
+    "runReferenceFields": ["decisionPath", "issuesPath", "completionStatusPath", "runDir"],
+    "taskReferenceFields": ["log", "statusFile", "script", "gateResult", "outputs"]
+  },
+  "m0": {
+    "checkpointPath": "agent-loop-docs/checkpoints/bossresume-full-refactor-m0-baseline-checkpoint.json",
+    "message": "State reconciliation is complete. M0 remains independently required; Product Agent and business code stay blocked until effectiveApproval=true."
+  },
+  "delivery": {
+    "registeredGates": ["PRD_GATE", "ARCHITECTURE_GATE", "UI_GATE", "DESIGN_GATE", "TEST_GATE", "PRODUCT_ACCEPTANCE_GATE", "USER_ACCEPTANCE_GATE", "ARCHIVE_GATE"],
+    "brainMayWriteBusinessCode": false,
+    "autoEnabled": false
+  }
+}
