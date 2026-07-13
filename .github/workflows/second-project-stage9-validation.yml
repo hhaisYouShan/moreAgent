@@ -1,0 +1,109 @@
+name: second-project-stage9-validation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/second-project-stage9-trigger.md
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout MoreAgent
+        uses: actions/checkout@v4
+        with:
+          path: moreagent
+          fetch-depth: 0
+      - name: Checkout real Python project
+        uses: actions/checkout@v4
+        with:
+          repository: pallets/itsdangerous
+          ref: main
+          path: second-project
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require Stage 9 program state
+        working-directory: moreagent
+        run: |
+          node -e "const s=require('./docs/program-status.json');if(s.currentStage!==9)throw new Error('Second-project validation requires currentStage=9; found '+s.currentStage)"
+      - name: Install MoreAgent dependencies
+        working-directory: moreagent
+        run: npm install
+      - name: Install Python project and discovered test dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install -e ./second-project
+          python - <<'PY' > /tmp/itsdangerous-test-requirements.txt
+          import pathlib, tomllib
+          data = tomllib.loads(pathlib.Path('second-project/pyproject.toml').read_text(encoding='utf-8'))
+          result = []
+          groups = data.get('dependency-groups', {})
+          optional = data.get('project', {}).get('optional-dependencies', {})
+          def add(value):
+              if isinstance(value, str) and value not in result:
+                  result.append(value)
+          for key in ('test', 'tests'):
+              for value in optional.get(key, []):
+                  add(value)
+              for value in groups.get(key, []):
+                  if isinstance(value, str):
+                      add(value)
+          for fallback in ('pytest>=8', 'build>=1'):
+              add(fallback)
+          print('\n'.join(result))
+          PY
+          if [ -s /tmp/itsdangerous-test-requirements.txt ]; then
+            python -m pip install -r /tmp/itsdangerous-test-requirements.txt
+          fi
+      - name: Inspect generic repository baseline
+        run: |
+          mkdir -p moreagent/validation/second-project/itsdangerous/results
+          node moreagent/scripts/validate-project.mjs \
+            --project second-project \
+            --profile moreagent/validation/second-project/itsdangerous/project-profile.json \
+            --output moreagent/validation/second-project/itsdangerous/results/itsdangerous-baseline-report.json \
+            --mode inspect
+      - name: Parse pyproject and execute Python verification
+        run: |
+          node moreagent/scripts/validate-python-project.mjs \
+            --project second-project \
+            --profile moreagent/validation/second-project/itsdangerous/project-profile.json \
+            --output-dir moreagent/validation/second-project/itsdangerous/results
+      - name: Run real Git worktree and integration smoke
+        run: |
+          node moreagent/scripts/run-repository-smoke.mjs \
+            --project second-project \
+            --project-id itsdangerous \
+            --workflow-id workflow-stage9-itsdangerous \
+            --prd README.md \
+            --output moreagent/validation/second-project/itsdangerous/results/itsdangerous-repository-smoke.json
+      - name: Aggregate Stage 9 evidence
+        run: |
+          node moreagent/scripts/run-second-project-validation.mjs \
+            --profile moreagent/validation/second-project/itsdangerous/project-profile.json \
+            --acceptance-profile moreagent/validation/second-project/itsdangerous/acceptance-profile.json \
+            --baseline moreagent/validation/second-project/itsdangerous/results/itsdangerous-baseline-report.json \
+            --python-report moreagent/validation/second-project/itsdangerous/results/itsdangerous-python-report.json \
+            --verification-report moreagent/validation/second-project/itsdangerous/results/itsdangerous-verification-report.json \
+            --smoke moreagent/validation/second-project/itsdangerous/results/itsdangerous-repository-smoke.json \
+            --output-dir moreagent/validation/second-project/itsdangerous/results
+      - name: Upload Stage 9 validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: second-project-stage9-validation
+          path: moreagent/validation/second-project/itsdangerous/results
+          if-no-files-found: warn
