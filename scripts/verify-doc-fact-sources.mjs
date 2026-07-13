@@ -9,6 +9,8 @@ const canonicalDocuments = [
   'docs/README.md',
   'docs/architecture.md',
   'docs/roadmap.md',
+  'docs/program-status.json',
+  'docs/repository-inventory.md',
   'docs/migration-ledger.md',
 ];
 const boundaryDocuments = [
@@ -33,7 +35,7 @@ const forbiddenCurrentGoalPatterns = [
   /当前目标[^\n]*完整交付[^\n]*bossresume/i,
 ];
 
-for (const file of canonicalDocuments) {
+for (const file of canonicalDocuments.filter((file) => file.endsWith('.md'))) {
   const content = await safeRead(file);
   for (const pattern of forbiddenCurrentGoalPatterns) {
     if (pattern.test(content)) {
@@ -47,8 +49,39 @@ for (let stage = 1; stage <= 9; stage += 1) {
   if (!new RegExp(`Stage ${stage}\\b`).test(roadmap)) errors.push(`docs/roadmap.md: missing Stage ${stage}`);
 }
 
-if (!/current_stage:\s*1\b/.test(roadmap)) errors.push('docs/roadmap.md: current_stage must be 1 during repository/document cleanup');
-if (!/(Stage 7[^\n]*BossResume|BossResume[^\n]*Stage 7)/i.test(roadmap)) errors.push('docs/roadmap.md: BossResume validation must be bound to Stage 7');
+const programStatus = await readJson('docs/program-status.json');
+const currentStage = Number(programStatus?.currentStage);
+if (!Number.isInteger(currentStage) || currentStage < 1 || currentStage > 9) {
+  errors.push('docs/program-status.json: currentStage must be an integer from 1 to 9');
+}
+if (!new RegExp(`current_stage:\\s*${currentStage}\\b`).test(roadmap)) {
+  errors.push('docs/roadmap.md: current_stage must match docs/program-status.json');
+}
+
+const stages = Array.isArray(programStatus?.stages) ? programStatus.stages : [];
+if (stages.length !== 9) errors.push('docs/program-status.json: exactly 9 stages are required');
+for (let stage = 1; stage <= 9; stage += 1) {
+  const record = stages.find((item) => item?.stage === stage);
+  if (!record) errors.push(`docs/program-status.json: missing stage ${stage}`);
+}
+const stage1 = stages.find((item) => item?.stage === 1);
+if (stage1?.status !== 'COMPLETED') errors.push('docs/program-status.json: Stage 1 must be COMPLETED after repository inventory');
+if (currentStage === 2) {
+  const stage2 = stages.find((item) => item?.stage === 2);
+  if (stage2?.status !== 'IN_PROGRESS') errors.push('docs/program-status.json: Stage 2 must be IN_PROGRESS when currentStage=2');
+}
+
+if (!/(Stage 7[^\n]*BossResume|BossResume[^\n]*Stage 7)/i.test(roadmap)) {
+  errors.push('docs/roadmap.md: BossResume validation must be bound to Stage 7');
+}
+
+const inventory = await safeRead('docs/repository-inventory.md');
+for (const requiredPath of ['src/', 'schemas/', 'profiles/', 'adapters/', 'validation/', 'scripts/agent-loop/', 'agent-loop-docs/', 'projects/bossresume/', 'migration-reference/']) {
+  if (!inventory.includes(`\`${requiredPath}\``)) errors.push(`docs/repository-inventory.md: missing classification for ${requiredPath}`);
+}
+for (const classification of ['CANONICAL', 'PROFILE', 'ADAPTER', 'COMPATIBILITY_ACTIVE', 'MIGRATION_REFERENCE', 'VALIDATION_RESERVED', 'HISTORICAL']) {
+  if (!inventory.includes(`\`${classification}\``)) errors.push(`docs/repository-inventory.md: missing classification ${classification}`);
+}
 
 const bossResumeBoundary = await safeRead('projects/bossresume/README.md');
 if (!/not[\s\S]*current AI Software Company OS delivery goal/i.test(bossResumeBoundary)) {
@@ -78,7 +111,8 @@ console.log('[verify:docs] passed');
 console.log(`- canonical documents: ${canonicalDocuments.length}`);
 console.log(`- repository boundary documents: ${boundaryDocuments.length}`);
 console.log('- roadmap stages: 9');
-console.log('- current stage: 1');
+console.log(`- current stage: ${currentStage}`);
+console.log('- Stage 1: COMPLETED');
 console.log('- BossResume role: Stage 7 real-project validation');
 
 async function exists(relativePath) {
@@ -95,5 +129,16 @@ async function safeRead(relativePath) {
     return await readFile(path.join(root, relativePath), 'utf8');
   } catch {
     return '';
+  }
+}
+
+async function readJson(relativePath) {
+  const raw = await safeRead(relativePath);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    errors.push(`${relativePath}: invalid JSON`);
+    return null;
   }
 }
