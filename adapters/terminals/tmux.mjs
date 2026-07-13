@@ -15,10 +15,13 @@ export function createTmuxTerminalAdapter({
       if (!command) throw new TypeError('command is required');
       const name = sanitize(sessionId || `${sessionPrefix}-${executionId}`);
       const shellCommand = quoteCommand(command, args);
+      const tmuxArgs = ['new-session', '-d', '-s', name];
+      if (cwd) tmuxArgs.push('-c', cwd);
+      tmuxArgs.push(shellCommand);
       return processRunner.execute({
         executionId,
         command: executable,
-        args: ['new-session', '-d', '-s', name, '-c', cwd, shellCommand],
+        args: tmuxArgs,
         cwd,
         env,
         timeoutMs,
