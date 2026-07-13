@@ -83,6 +83,8 @@ export function createTaskExecutor({
       let heartbeat = null;
       let runnerResult = null;
       let executionError = null;
+      let validationError = null;
+      const cleanupErrors = [];
 
       try {
         workspace = await workspaceManager.create({
@@ -131,7 +133,7 @@ export function createTaskExecutor({
       }
 
       const finishedAt = timestamp();
-      const normalized = normalizeRunnerResult(runnerResult, executionError);
+      let normalized = normalizeRunnerResult(runnerResult, executionError);
       const agentResult = Object.freeze({
         schemaVersion: '1.0',
         entityType: 'AGENT_RESULT',
@@ -147,22 +149,54 @@ export function createTaskExecutor({
         testsRun: Object.freeze([...(runnerResult?.parsedOutput?.testsRun || [])]),
         issues: Object.freeze([...(runnerResult?.parsedOutput?.issueIds || [])]),
         knownRisks: Object.freeze([...(runnerResult?.parsedOutput?.knownRisks || [])]),
-        sourceCommit: runnerResult?.parsedOutput?.sourceCommit || null,
+        ...(runnerResult?.parsedOutput?.sourceCommit ? { sourceCommit: runnerResult.parsedOutput.sourceCommit } : {}),
         startedAt,
         finishedAt,
       });
 
-      if (typeof validateAgentResult === 'function') await validateAgentResult(agentResult);
-
-      if (session) {
-        if (closeSession) sessionManager.close(session.sessionId);
-        else sessionManager.markIdle(session.sessionId);
+      try {
+        if (typeof validateAgentResult === 'function') await validateAgentResult(agentResult);
+      } catch (error) {
+        validationError = error;
+        normalized = {
+          runStatus: RunStatus.FAILED,
+          attemptStatus: AttemptStatus.FAILED,
+          agentConclusion: 'FAILED',
+          failureReason: 'output_contract_error',
+        };
+        emit('task.execution_output_invalid', { taskId: task.taskId, runId, attemptId, error: error.message });
       }
 
       const shouldRetainWorkspace = normalized.runStatus !== RunStatus.SUCCEEDED && retainWorkspaceOnFailure;
-      if (workspace && !shouldRetainWorkspace) await workspaceManager.release(workspace.workspaceId);
-      else if (workspace && shouldRetainWorkspace) workspaceManager.markStale(workspace.workspaceId, normalized.failureReason || 'execution_failed');
-      lockManager.release({ ownerId });
+      try {
+        if (session) {
+          if (closeSession) sessionManager.close(session.sessionId);
+          else sessionManager.markIdle(session.sessionId);
+        }
+      } catch (error) {
+        cleanupErrors.push({ resource: 'session', error: error.message });
+      }
+      try {
+        if (workspace && !shouldRetainWorkspace) await workspaceManager.release(workspace.workspaceId);
+        else if (workspace && shouldRetainWorkspace) workspaceManager.markStale(workspace.workspaceId, normalized.failureReason || 'execution_failed');
+      } catch (error) {
+        cleanupErrors.push({ resource: 'workspace', error: error.message });
+      } finally {
+        try {
+          lockManager.release({ ownerId });
+        } catch (error) {
+          cleanupErrors.push({ resource: 'lock', error: error.message });
+        }
+      }
+
+      if (cleanupErrors.length && normalized.runStatus === RunStatus.SUCCEEDED) {
+        normalized = {
+          runStatus: RunStatus.FAILED,
+          attemptStatus: AttemptStatus.FAILED,
+          agentConclusion: 'FAILED',
+          failureReason: 'cleanup_failed',
+        };
+      }
 
       const result = Object.freeze({
         taskId: task.taskId,
@@ -199,6 +233,8 @@ export function createTaskExecutor({
         runnerResult,
         workspaceRetained: shouldRetainWorkspace,
         failureReason: normalized.failureReason,
+        validationError: validationError ? serializeError(validationError) : null,
+        cleanupErrors: Object.freeze(cleanupErrors.map((item) => Object.freeze(item))),
       });
 
       emit('task.execution_finished', { taskId: task.taskId, runId, attemptId, status: normalized.runStatus, failureReason: normalized.failureReason });
@@ -212,7 +248,7 @@ export function createTaskExecutor({
 
   function timestamp() {
     const value = now();
-    const date = typeof value === 'number' ? new Date(value) : new Date(value);
+    const date = new Date(value);
     if (Number.isNaN(date.getTime())) throw new TypeError('now() must return a valid date value');
     return date.toISOString();
   }
@@ -235,13 +271,50 @@ function normalizeRunnerResult(result, error) {
 function frozenFailure({ task, runId, attemptId, attemptNumber, attemptType, startedAt, status, failureReason, details }) {
   return Object.freeze({
     taskId: task.taskId,
-    attempt: Object.freeze({ attemptId, taskId: task.taskId, workstreamId: task.workstreamId, attemptNumber, attemptType, status: AttemptStatus.BLOCKED, inputHash: task.inputHash, issueIds: Object.freeze([]), startedAt, finishedAt: startedAt }),
-    run: Object.freeze({ runId, taskId: task.taskId, attempt: attemptNumber, executionKey: executionKey(task), status, sessionId: null, workspaceId: null, startedAt, finishedAt: startedAt, exitCode: null }),
+    attempt: Object.freeze({
+      schemaVersion: '1.0',
+      entityType: 'ATTEMPT',
+      attemptId,
+      taskId: task.taskId,
+      workstreamId: task.workstreamId,
+      runId,
+      attemptNumber,
+      attemptType,
+      status: AttemptStatus.BLOCKED,
+      inputHash: task.inputHash,
+      issueIds: Object.freeze([]),
+      startedAt,
+      finishedAt: startedAt,
+    }),
+    run: Object.freeze({
+      schemaVersion: '1.0',
+      entityType: 'RUN',
+      runId,
+      taskId: task.taskId,
+      attempt: attemptNumber,
+      executionKey: executionKey(task),
+      status,
+      sessionId: null,
+      workspaceId: null,
+      startedAt,
+      finishedAt: startedAt,
+      exitCode: null,
+    }),
     agentResult: null,
     runnerResult: null,
     workspaceRetained: false,
     failureReason,
     details,
+    validationError: null,
+    cleanupErrors: Object.freeze([]),
+  });
+}
+
+function serializeError(error) {
+  return Object.freeze({
+    name: error?.name || 'Error',
+    code: error?.code || null,
+    message: error?.message || String(error),
   });
 }
 
