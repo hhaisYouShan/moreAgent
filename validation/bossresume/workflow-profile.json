@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "1.0",
+  "profileType": "WORKFLOW_VALIDATION_PROFILE",
+  "profileId": "bossresume-stage7-workflow",
+  "projectId": "bossresume",
+  "projectType": "EXISTING_REFACTOR",
+  "phases": [
+    "INTAKE",
+    "PRODUCT_DESIGN",
+    "MULTI_ROLE_REVIEW",
+    "TECHNICAL_DESIGN",
+    "TASK_PLANNING",
+    "IMPLEMENTATION",
+    "REVIEW",
+    "INTEGRATION",
+    "SYSTEM_TEST",
+    "PRODUCT_ACCEPTANCE",
+    "USER_ACCEPTANCE",
+    "RELEASE",
+    "MAINTENANCE"
+  ],
+  "registeredGates": [
+    "PRD_GATE",
+    "ARCHITECTURE_GATE",
+    "UI_GATE",
+    "DESIGN_GATE",
+    "TEST_GATE",
+    "PRODUCT_ACCEPTANCE_GATE",
+    "USER_ACCEPTANCE_GATE",
+    "ARCHIVE_GATE"
+  ],
+  "stage7ValidationSlices": [
+    {
+      "sliceId": "BR-V1",
+      "name": "Repository baseline and Project Map",
+      "writeMode": "READ_ONLY",
+      "required": true
+    },
+    {
+      "sliceId": "BR-V2",
+      "name": "PRD and requirement trace ingestion",
+      "writeMode": "VALIDATION_ARTIFACT_ONLY",
+      "required": true
+    },
+    {
+      "sliceId": "BR-V3",
+      "name": "Task DAG and policy dry run",
+      "writeMode": "NO_BUSINESS_CODE",
+      "required": true
+    },
+    {
+      "sliceId": "BR-V4",
+      "name": "Ephemeral Git worktree integration smoke",
+      "writeMode": "LOCAL_EPHEMERAL_VALIDATION_PATH_ONLY",
+      "required": true
+    },
+    {
+      "sliceId": "BR-V5",
+      "name": "Existing build and test verification",
+      "writeMode": "READ_ONLY_SOURCE",
+      "required": true
+    }
+  ],
+  "concurrency": {
+    "maxConcurrentCodeAgents": 1,
+    "maxConcurrentTestTasks": 1,
+    "maxConcurrentIntegrationTasks": 1
+  },
+  "autoEnabled": false,
+  "userAcceptanceRequiredForBusinessDelivery": true
+}
