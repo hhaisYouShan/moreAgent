@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "1.0",
+  "profileType": "PROJECT_VALIDATION_PROFILE",
+  "profileId": "itsdangerous-stage9",
+  "projectId": "itsdangerous",
+  "repository": {
+    "provider": "GITHUB",
+    "fullName": "pallets/itsdangerous",
+    "ref": "main",
+    "baselinePolicy": "RESOLVE_AND_RECORD_BEFORE_EXECUTION"
+  },
+  "projectType": "EXISTING_LIBRARY",
+  "language": "Python",
+  "packageContract": "pyproject.toml",
+  "testFramework": "pytest",
+  "businessCodeMode": "READ_ONLY",
+  "requirementSourcePath": "README.md",
+  "requiredPaths": [
+    { "path": "pyproject.toml", "type": "file", "required": true },
+    { "path": "src/itsdangerous", "type": "directory", "required": true },
+    { "path": "tests", "type": "directory", "required": true },
+    { "path": "README.md", "type": "file", "required": true }
+  ],
+  "moduleRoots": ["src", "tests"],
+  "manifests": [],
+  "excludes": [".venv", "venv", ".tox", ".pytest_cache", ".mypy_cache", "htmlcov"],
+  "maxFiles": 20000,
+  "python": {
+    "pyprojectPath": "pyproject.toml",
+    "sourcePaths": ["src/itsdangerous"],
+    "testPaths": ["tests"],
+    "verificationCommands": [
+      {
+        "verificationId": "pytest",
+        "command": "python",
+        "args": ["-m", "pytest"],
+        "cwd": ".",
+        "timeoutMs": 900000
+      },
+      {
+        "verificationId": "package-import",
+        "command": "python",
+        "args": ["-c", "import itsdangerous; print(itsdangerous.__name__)"],
+        "cwd": ".",
+        "timeoutMs": 60000
+      }
+    ]
+  },
+  "materialDifferencesFromBossResume": [
+    "PYTHON_VS_TYPESCRIPT_JAVASCRIPT",
+    "LIBRARY_VS_FULL_STACK_APPLICATION",
+    "PYPROJECT_PYTEST_VS_NPM_MULTI_PACKAGE",
+    "NO_DATABASE_OR_BROWSER_UI"
+  ],
+  "forbiddenActions": [
+    "PUSH_TO_SECOND_PROJECT",
+    "MODIFY_UPSTREAM_BRANCH",
+    "WRITE_PROJECT_SOURCE",
+    "USE_PRODUCTION_SECRETS",
+    "ASSUME_PRODUCT_OR_USER_ACCEPTANCE"
+  ]
+}
