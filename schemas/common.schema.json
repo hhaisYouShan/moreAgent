@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moreagent.dev/schemas/common.schema.json",
+  "title": "MoreAgent common contract definitions",
+  "$defs": {
+    "id": { "type": "string", "minLength": 1, "maxLength": 200, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$" },
+    "nonEmptyString": { "type": "string", "minLength": 1 },
+    "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "isoDateTime": { "type": "string", "format": "date-time" },
+    "projectType": { "enum": ["NEW_PROJECT", "EXISTING_REFACTOR"] },
+    "workflowPhase": {
+      "enum": [
+        "INTAKE", "PRODUCT_DESIGN", "MULTI_ROLE_REVIEW", "TECHNICAL_DESIGN", "TASK_PLANNING",
+        "IMPLEMENTATION", "REVIEW", "INTEGRATION", "SYSTEM_TEST", "PRODUCT_ACCEPTANCE",
+        "USER_ACCEPTANCE", "RELEASE", "MAINTENANCE", "ARCHIVED"
+      ]
+    },
+    "workflowStatus": { "enum": ["DRAFT", "READY", "RUNNING", "WAITING", "BLOCKED", "COMPLETED", "FAILED", "CANCELLED", "ARCHIVED"] },
+    "taskStatus": { "enum": ["DRAFT", "BLOCKED", "READY", "RUNNING", "WAITING_REVIEW", "WAITING_RECHECK", "APPROVED", "FAILED", "CANCELLED", "SUPERSEDED"] },
+    "runStatus": { "enum": ["QUEUED", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED", "TIMED_OUT", "STALE"] },
+    "gateConclusion": { "enum": ["APPROVED", "CHANGES_REQUESTED", "BLOCKED", "FAILED"] },
+    "issueSeverity": { "enum": ["BLOCKING", "MAJOR", "MINOR"] },
+    "issueStatus": { "enum": ["OPEN", "IN_PROGRESS", "READY_FOR_RECHECK", "CLOSED", "DEFERRED"] },
+    "decisionType": { "enum": ["AUTO_FIXABLE", "HUMAN_DECISION_REQUIRED", "SYSTEM_RECOVERY_REQUIRED", "SECURITY_APPROVAL_REQUIRED", "DEFERRED"] },
+    "artifactStatus": { "enum": ["DRAFT", "ACTIVE", "SUPERSEDED", "REJECTED", "ARCHIVED"] },
+    "acceptanceType": { "enum": ["PRODUCT", "USER"] },
+    "acceptanceStatus": { "enum": ["PENDING", "APPROVED", "REJECTED"] },
+    "stringArray": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "idArray": { "type": "array", "items": { "$ref": "#/$defs/id" }, "uniqueItems": true },
+    "commandEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "cwd", "exitCode", "environment", "commitSha", "executedAt", "logPath"],
+      "properties": {
+        "command": { "$ref": "#/$defs/nonEmptyString" },
+        "cwd": { "$ref": "#/$defs/nonEmptyString" },
+        "exitCode": { "type": "integer" },
+        "environment": { "$ref": "#/$defs/nonEmptyString" },
+        "commitSha": { "type": "string", "minLength": 7 },
+        "executedAt": { "$ref": "#/$defs/isoDateTime" },
+        "logPath": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    }
+  }
+}
