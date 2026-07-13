@@ -1,0 +1,91 @@
+name: bossresume-stage7-validation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/bossresume-stage7-trigger.md
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout MoreAgent
+        uses: actions/checkout@v4
+        with:
+          path: moreagent
+          fetch-depth: 0
+      - name: Checkout real BossResume repository
+        uses: actions/checkout@v4
+        with:
+          repository: hhaisYouShan/bossResume
+          ref: master
+          path: bossresume
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+      - name: Require Stage 7 program state
+        working-directory: moreagent
+        run: |
+          node -e "const s=require('./docs/program-status.json');if(s.currentStage!==7)throw new Error('BossResume validation requires currentStage=7; found '+s.currentStage)"
+      - name: Install MoreAgent dependencies
+        working-directory: moreagent
+        run: npm install
+      - name: Install discovered BossResume dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          install_package() {
+            local dir="$1"
+            if [ ! -f "$dir/package.json" ]; then
+              return
+            fi
+            echo "::group::install $dir"
+            if [ -f "$dir/package-lock.json" ]; then
+              (cd "$dir" && npm ci)
+            else
+              (cd "$dir" && npm install --no-package-lock)
+            fi
+            echo "::endgroup::"
+          }
+          install_package bossresume
+          install_package bossresume/client
+          install_package bossresume/server
+      - name: Inspect BossResume baseline and execute available commands
+        run: |
+          mkdir -p moreagent/validation/bossresume/results
+          node moreagent/scripts/validate-project.mjs \
+            --project bossresume \
+            --profile moreagent/validation/bossresume/project-profile.json \
+            --output moreagent/validation/bossresume/results/bossresume-baseline-report.json \
+            --mode verify
+      - name: Run real Git worktree and integration smoke
+        run: |
+          node moreagent/scripts/run-repository-smoke.mjs \
+            --project bossresume \
+            --project-id bossresume \
+            --workflow-id workflow-bossresume-stage7-validation \
+            --prd docs/prd/bossresume-full-refactor-prd.md \
+            --output moreagent/validation/bossresume/results/bossresume-repository-smoke.json
+      - name: Aggregate Stage 7 evidence and findings
+        run: |
+          node moreagent/scripts/run-bossresume-validation.mjs \
+            --project bossresume \
+            --profile moreagent/validation/bossresume/project-profile.json \
+            --acceptance-profile moreagent/validation/bossresume/acceptance-profile.json \
+            --baseline moreagent/validation/bossresume/results/bossresume-baseline-report.json \
+            --smoke moreagent/validation/bossresume/results/bossresume-repository-smoke.json \
+            --output-dir moreagent/validation/bossresume/results
+      - name: Upload BossResume validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bossresume-stage7-validation
+          path: moreagent/validation/bossresume/results
+          if-no-files-found: warn
