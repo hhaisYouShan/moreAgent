@@ -14,6 +14,7 @@ const canonicalDocuments = [
 const boundaryDocuments = [
   'profiles/README.md',
   'validation/README.md',
+  'validation/bossresume/README.md',
   'legacy/README.md',
   'projects/bossresume/README.md',
 ];
@@ -60,6 +61,11 @@ if (!/not[\s\S]*canonical OS product or architecture source/i.test(bossResumeBou
 const validationBoundary = await safeRead('validation/README.md');
 if (!/(Stage 7[^\n]*BossResume|BossResume[^\n]*Stage 7)/i.test(validationBoundary)) {
   errors.push('validation/README.md: must identify BossResume as the Stage 7 validation target');
+}
+
+const bossResumeValidation = await safeRead('validation/bossresume/README.md');
+if (!/inactive until Stage 6 system-level testing is approved/i.test(bossResumeValidation)) {
+  errors.push('validation/bossresume/README.md: must remain inactive until Stage 6 approval');
 }
 
 if (errors.length) {
