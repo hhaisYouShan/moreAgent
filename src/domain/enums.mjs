@@ -33,6 +33,16 @@ export const WorkflowStatus = defineEnum([
   'ARCHIVED',
 ]);
 
+export const WorkstreamStatus = defineEnum([
+  'PLANNED',
+  'ACTIVE',
+  'WAITING',
+  'BLOCKED',
+  'COMPLETED',
+  'FAILED',
+  'CANCELLED',
+]);
+
 export const TaskStatus = defineEnum([
   'DRAFT',
   'BLOCKED',
@@ -46,6 +56,9 @@ export const TaskStatus = defineEnum([
   'SUPERSEDED',
 ]);
 
+export const AttemptType = defineEnum(['INITIAL', 'REPAIR', 'RECHECK', 'REVERIFY']);
+export const AttemptStatus = defineEnum(['PLANNED', 'RUNNING', 'SUCCEEDED', 'FAILED', 'BLOCKED', 'CANCELLED', 'TIMED_OUT', 'STALE']);
+
 export const RunStatus = defineEnum([
   'QUEUED',
   'RUNNING',
@@ -55,6 +68,10 @@ export const RunStatus = defineEnum([
   'TIMED_OUT',
   'STALE',
 ]);
+
+export const SessionStatus = defineEnum(['ACTIVE', 'IDLE', 'STALE', 'CLOSED']);
+export const WorkspaceType = defineEnum(['WORKTREE', 'CONTAINER', 'LOCAL']);
+export const WorkspaceStatus = defineEnum(['CREATING', 'READY', 'IN_USE', 'STALE', 'RELEASING', 'RELEASED', 'FAILED']);
 
 export const GateConclusion = defineEnum([
   'APPROVED',
@@ -81,8 +98,14 @@ export const CANONICAL_ENUMS = Object.freeze({
   ProjectType,
   WorkflowPhase,
   WorkflowStatus,
+  WorkstreamStatus,
   TaskStatus,
+  AttemptType,
+  AttemptStatus,
   RunStatus,
+  SessionStatus,
+  WorkspaceType,
+  WorkspaceStatus,
   GateConclusion,
   IssueSeverity,
   IssueStatus,
