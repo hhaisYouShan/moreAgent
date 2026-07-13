@@ -25,7 +25,8 @@
     "verify:docs": "node scripts/verify-doc-fact-sources.mjs",
     "verify:contracts": "node --test test/contracts.test.mjs test/schema-contracts.test.mjs test/domain-contracts.test.mjs",
     "verify:control-plane": "node --test test/control-plane.test.mjs",
-    "verify:execution-plane": "node --test test/execution-plane.test.mjs"
+    "verify:execution-plane": "node --test test/execution-plane.test.mjs",
+    "verify:evidence-operations": "node --test test/evidence-operations.test.mjs"
   },
   "dependencies": {
     "ajv": "^8.17.1",
