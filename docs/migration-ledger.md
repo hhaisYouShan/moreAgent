@@ -16,7 +16,7 @@ REFERENCE -> EXTRACTING -> DUAL_RUN_PASS -> SWITCHED -> DELETABLE -> REMOVED
 | Gate and Issue contracts | `gate.mjs`, `gate-result-validator.mjs`, `issue-router.mjs` | `src/contracts/` | `EXTRACTING` | Registered gates and structured Issue parity |
 | Run, task and event lifecycle | `run-status.mjs`, `persistence.mjs` | `src/runtime/` | `EXTRACTING` | Resume and stale-pointer cases pass |
 | Worktree lifecycle | `worktree.mjs`, `worktree-manifest.mjs`, `merge-steward.mjs` | `src/runtime/worktrees.mjs` | `EXTRACTING` | No orphan/prunable regression |
-| Planner and orchestration | `planner.mjs`, `orchestrator.mjs`, `task-context.mjs` | `src/runtime/` | `EXTRACTING` | Same task DAG and allowed scope |
+| Planner and orchestration | `planner.mjs`, `orchestrator.mjs`, `task-context.mjs` | `src/runtime/` | `EXTRACTING` | Generic guarded shell is implemented; full task-context and runner parity remain |
 | Agent runners and prompts | `*-runner.mjs`, `agents/**` | `src/runners/`, `templates/` | `REFERENCE` | Runner and prompt adapter acceptance |
 | M0 policy | `m0-guard.mjs`, checkpoint contract | `src/contracts/checkpoint.mjs` + adapter | `EXTRACTING` | M0 remains adapter policy, not core gate |
 
