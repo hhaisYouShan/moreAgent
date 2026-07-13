@@ -1,0 +1,187 @@
+name: full-program-finalization
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/full-program-finalization-trigger.md
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    concurrency:
+      group: full-program-finalization
+      cancel-in-progress: false
+    steps:
+      - name: Checkout latest MoreAgent main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: moreagent
+          fetch-depth: 0
+      - name: Checkout real BossResume
+        uses: actions/checkout@v4
+        with:
+          repository: hhaisYouShan/bossResume
+          ref: master
+          path: bossresume
+          fetch-depth: 0
+      - name: Checkout materially different Python project
+        uses: actions/checkout@v4
+        with:
+          repository: pallets/itsdangerous
+          ref: main
+          path: second-project
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Record final validation Commit
+        working-directory: moreagent
+        run: echo "FINAL_MAIN_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Install and verify MoreAgent
+        working-directory: moreagent
+        run: |
+          npm install
+          npm run verify
+      - name: Install BossResume dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          install_package() {
+            local dir="$1"
+            [ -f "$dir/package.json" ] || return 0
+            if [ -f "$dir/package-lock.json" ]; then
+              (cd "$dir" && npm ci)
+            else
+              (cd "$dir" && npm install --no-package-lock)
+            fi
+          }
+          install_package bossresume
+          install_package bossresume/client
+          install_package bossresume/server
+      - name: Generate BossResume baseline evidence
+        continue-on-error: true
+        run: |
+          mkdir -p /tmp/final-results/bossresume
+          node moreagent/scripts/validate-project.mjs \
+            --project bossresume \
+            --profile moreagent/validation/bossresume/project-profile.json \
+            --output /tmp/final-results/bossresume/bossresume-baseline-report.json \
+            --mode verify
+      - name: Generate BossResume real Git Integration evidence
+        continue-on-error: true
+        run: |
+          node moreagent/scripts/run-repository-smoke.mjs \
+            --project bossresume \
+            --project-id bossresume \
+            --workflow-id workflow-bossresume-final-validation \
+            --prd docs/prd/bossresume-full-refactor-prd.md \
+            --output /tmp/final-results/bossresume/bossresume-repository-smoke.json
+      - name: Aggregate BossResume OS validation
+        continue-on-error: true
+        run: |
+          node moreagent/scripts/run-bossresume-validation.mjs \
+            --project bossresume \
+            --profile moreagent/validation/bossresume/project-profile.json \
+            --acceptance-profile moreagent/validation/bossresume/acceptance-profile.json \
+            --baseline /tmp/final-results/bossresume/bossresume-baseline-report.json \
+            --smoke /tmp/final-results/bossresume/bossresume-repository-smoke.json \
+            --output-dir /tmp/final-results/bossresume
+      - name: Install Python project and test dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install -e ./second-project
+          python - <<'PY' > /tmp/second-project-requirements.txt
+          import pathlib, tomllib
+          data = tomllib.loads(pathlib.Path('second-project/pyproject.toml').read_text(encoding='utf-8'))
+          values = []
+          for key in ('test', 'tests'):
+              for value in data.get('project', {}).get('optional-dependencies', {}).get(key, []):
+                  if isinstance(value, str) and value not in values: values.append(value)
+              for value in data.get('dependency-groups', {}).get(key, []):
+                  if isinstance(value, str) and value not in values: values.append(value)
+          for value in ('pytest>=8', 'build>=1'):
+              if value not in values: values.append(value)
+          print('\n'.join(values))
+          PY
+          python -m pip install -r /tmp/second-project-requirements.txt
+      - name: Generate Python project baseline
+        run: |
+          mkdir -p /tmp/final-results/second-project
+          node moreagent/scripts/validate-project.mjs \
+            --project second-project \
+            --profile moreagent/validation/second-project/itsdangerous/project-profile.json \
+            --output /tmp/final-results/second-project/itsdangerous-baseline-report.json \
+            --mode inspect
+      - name: Execute Python adapter verification
+        run: |
+          node moreagent/scripts/validate-python-project.mjs \
+            --project second-project \
+            --profile moreagent/validation/second-project/itsdangerous/project-profile.json \
+            --output-dir /tmp/final-results/second-project
+      - name: Generate second-project real Git Integration evidence
+        run: |
+          node moreagent/scripts/run-repository-smoke.mjs \
+            --project second-project \
+            --project-id itsdangerous \
+            --workflow-id workflow-stage9-final-validation \
+            --prd README.md \
+            --output /tmp/final-results/second-project/itsdangerous-repository-smoke.json
+      - name: Aggregate second-project generality evidence
+        run: |
+          node moreagent/scripts/run-second-project-validation.mjs \
+            --profile moreagent/validation/second-project/itsdangerous/project-profile.json \
+            --acceptance-profile moreagent/validation/second-project/itsdangerous/acceptance-profile.json \
+            --baseline /tmp/final-results/second-project/itsdangerous-baseline-report.json \
+            --python-report /tmp/final-results/second-project/itsdangerous-python-report.json \
+            --verification-report /tmp/final-results/second-project/itsdangerous-verification-report.json \
+            --smoke /tmp/final-results/second-project/itsdangerous-repository-smoke.json \
+            --output-dir /tmp/final-results/second-project
+      - name: Apply atomic nine-stage final Gate
+        working-directory: moreagent
+        env:
+          BOSSRESUME_RESULTS_DIR: /tmp/final-results/bossresume
+          SECOND_PROJECT_RESULTS_DIR: /tmp/final-results/second-project
+          FINAL_VALIDATION_WORKFLOW: full-program-finalization
+          FINAL_VALIDATION_RUN_ID: ${{ github.run_id }}
+          FINAL_VALIDATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          FINAL_VALIDATION_HEAD_BRANCH: ${{ github.head_ref }}
+          FINAL_VALIDATION_HEAD_SHA: ${{ env.FINAL_MAIN_SHA }}
+        run: node scripts/finalize-nine-stage-program-v2.mjs
+      - name: Verify final program evidence
+        working-directory: moreagent
+        run: |
+          node scripts/verify-doc-fact-sources.mjs
+          node scripts/verify-program-completion.mjs
+      - name: Commit final evidence to main
+        working-directory: moreagent
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs validation/bossresume/results validation/second-project/itsdangerous/results
+          git commit -m "docs: complete all nine AI Software Company OS stages"
+          git pull --rebase origin main
+          git push origin HEAD:main
+      - name: Upload final evidence bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-software-company-os-final-evidence
+          path: |
+            /tmp/final-results
+            moreagent/docs/program-completion.json
+            moreagent/docs/stage7-validation-report.json
+            moreagent/docs/stage8-correction-report.json
+            moreagent/docs/stage9-validation-report.json
+          if-no-files-found: warn
