@@ -32,13 +32,17 @@
       "additionalProperties": false,
       "required": ["command", "cwd", "exitCode", "environment", "commitSha", "executedAt", "logPath"],
       "properties": {
+        "verificationId": { "$ref": "#/$defs/id" },
         "command": { "$ref": "#/$defs/nonEmptyString" },
         "cwd": { "$ref": "#/$defs/nonEmptyString" },
         "exitCode": { "type": "integer" },
         "environment": { "$ref": "#/$defs/nonEmptyString" },
         "commitSha": { "type": "string", "minLength": 7 },
         "executedAt": { "$ref": "#/$defs/isoDateTime" },
-        "logPath": { "$ref": "#/$defs/nonEmptyString" }
+        "logPath": { "$ref": "#/$defs/nonEmptyString" },
+        "result": { "enum": ["PASS", "FAIL", "BLOCKED", "NOT_RUN", "SKIPPED_NOT_REQUIRED"] },
+        "stdout": { "type": "string" },
+        "stderr": { "type": "string" }
       }
     }
   }
