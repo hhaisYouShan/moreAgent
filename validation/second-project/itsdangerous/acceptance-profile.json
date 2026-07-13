@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1.0",
+  "profileType": "VALIDATION_ACCEPTANCE_PROFILE",
+  "profileId": "itsdangerous-stage9-acceptance",
+  "projectId": "itsdangerous",
+  "requiredChecks": [
+    "REAL_BASELINE_COMMIT_RECORDED",
+    "PYPROJECT_PARSED",
+    "PYTHON_VERSION_RECORDED",
+    "SOURCE_AND_TEST_PATHS_PRESENT",
+    "PYTEST_PASS",
+    "PACKAGE_IMPORT_PASS",
+    "PROJECT_MAP_GENERATED",
+    "TASK_DAG_VALID",
+    "POLICY_DRY_RUN_PASS",
+    "REAL_GIT_INTEGRATION_COMMIT_CREATED",
+    "NO_PROJECT_SOURCE_MODIFIED",
+    "NO_REMOTE_PUSH",
+    "MATERIAL_DIFFERENCES_PROVEN",
+    "NO_CORE_CONTRACT_CHANGE_REQUIRED",
+    "NO_OPEN_BLOCKING_OR_MAJOR"
+  ],
+  "requiredArtifacts": [
+    "itsdangerous-baseline-report.json",
+    "itsdangerous-python-report.json",
+    "itsdangerous-verification-report.json",
+    "itsdangerous-task-dag.json",
+    "itsdangerous-policy-dry-run.json",
+    "itsdangerous-integration-evidence.json",
+    "itsdangerous-validation-report.json"
+  ],
+  "completionRule": {
+    "allRequiredChecksPass": true,
+    "openBlockingCount": 0,
+    "openMajorCount": 0,
+    "sourceChangesAllowed": false,
+    "remotePushAllowed": false,
+    "coreContractChangesAllowedDuringValidation": false,
+    "productAcceptanceImplied": false,
+    "userAcceptanceImplied": false
+  }
+}
